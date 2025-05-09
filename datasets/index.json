@@ -21,7 +21,7 @@
       "X": "https://zenodo.org/record/15348871/files/maizeX.csv",
       "Y": "https://zenodo.org/record/15348871/files/maizeY.csv",
       "Z": "https://zenodo.org/record/15348871/files/maizeZ.json",
-      "citation": "McFarland, Bridget A., et al. 'Maize genomes to fields (G2F): 2014–2017 field seasons: genotype, phenotype, climatic, soil, and inbred ear image datasets.' BMC research notes 13.1 (2020): 1-6."
+      "citation": "Washburn, Jacob D., et al. 'Global genotype by environment prediction competition reveals that diverse modeling strategies can deliver satisfactory maize yield estimates.' Genetics 229.2 (2025): iyae195"
     },
     "oyster": {
       "X": "https://zenodo.org/record/15348871/files/oysterX.csv",
