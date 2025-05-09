@@ -1,0 +1,62 @@
+{
+    "barley": {
+      "X": "https://zenodo.org/record/15348871/files/barleyX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/barleyY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/barleyZ.json",
+      "citation": "Gonzalez, Maria Y., et al. 'Genomic prediction models trained with historical records enable populating the German ex situ genebank bio-digital resource center of barley (Hordeum sp.) with information on resistances to soilborne barley mosaic viruses.' Theoretical and Applied Genetics 134 (2021): 2181-2196."
+    },
+    "bean": {
+      "X": "https://zenodo.org/record/15348871/files/beanX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/beanY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/beanZ.json",
+      "citation": "Diaz, Santiago, et al. 'Genetic mapping for agronomic traits in a MAGIC population of common bean (Phaseolus vulgaris L.) under drought conditions.' BMC genomics 21.1 (2020): 1-20."
+    },
+    "lentil": {
+      "X": "https://zenodo.org/record/15348871/files/lentilX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/lentilY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/lentilZ.json",
+      "citation": "Haile, Teketel A., et al. 'Genomic selection for lentil breeding: Empirical evidence.' The Plant Genome 13.1 (2020): e20002."
+    },
+    "maize": {
+      "X": "https://zenodo.org/record/15348871/files/maizeX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/maizeY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/maizeZ.json",
+      "citation": "McFarland, Bridget A., et al. 'Maize genomes to fields (G2F): 2014–2017 field seasons: genotype, phenotype, climatic, soil, and inbred ear image datasets.' BMC research notes 13.1 (2020): 1-6."
+    },
+    "oyster": {
+      "X": "https://zenodo.org/record/15348871/files/oysterX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/oysterY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/oysterZ.json",
+      "citation": "McCarty, Alexandra J., Standish K. Allen Jr, and Louis V. Plough. 'Genome-wide analysis of acute low salinity tolerance in the eastern oyster Crassostrea virginica and potential of genomic selection for trait improvement.' G3 12.1 (2022): jkab368."
+    },
+    "pig": {
+      "X": "https://zenodo.org/record/15348871/files/pigX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/pigY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/pigZ.json",
+      "citation":"Xie, L., et al. 'Accurate prediction and genome‐wide association analysis of digital intramuscular fat content in longissimus muscle of pigs.' Animal Genetics 52.5 (2021): 633-644."
+    },
+    "pine": {
+      "X": "https://zenodo.org/record/15348871/files/pineX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/pineY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/pineZ.json",
+      "citation": "Resende Jr, M. F. R., et al. 'Accuracy of genomic selection methods in a standard data set of loblolly pine (Pinus taeda L.).' Genetics 190.4 (2012): 1503-1510."
+    },
+    "rice": {
+      "X": "https://zenodo.org/record/15348871/files/riceX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/riceY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/riceZ.json",
+      "citation":"Zhao, Keyan, et al. 'Genome-wide association mapping reveals a rich genetic architecture of complex traits in Oryza sativa.' Nature communications 2.1 (2011): 467."
+    },
+    "soybean": {
+      "X": "https://zenodo.org/record/15348871/files/soybeanX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/soybeanY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/soybeanZ.json",
+      "citation": "Kaler, Avjinder S., et al. 'Genome-wide association mapping of canopy wilting in diverse soybean genotypes.' Theoretical and Applied Genetics 130 (2017): 2203-2217.\nKaler, Avjinder S., et al. 'Genome‐wide association mapping of carbon isotope and oxygen isotope ratios in diverse soybean genotypes.' Crop science 57.6 (2017): 3085-3100."
+    },
+    "wheatG": {
+      "X": "https://zenodo.org/record/15348871/files/wheatGX.csv",
+      "Y": "https://zenodo.org/record/15348871/files/wheatGY.csv",
+      "Z": "https://zenodo.org/record/15348871/files/wheatGZ.json",
+      "citation": "Gogna, Abhishek, et al. 'Gabi wheat a panel of European elite lines as central stock for wheat genetic research.' Scientific Data 9.1 (2022): 538."
+    }
+  }

@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+.Ruserdata
+
+# General
+*.DS_Store
