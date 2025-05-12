@@ -1,4 +1,4 @@
-crop,trait,model,CV_split,correlation,RMSE
+species,trait,model,CV_split,correlation,RMSE
 barley,BaMMV,BayesA,Split1CV1,0.727444704960406,1.60774195341287
 barley,BaMMV,BayesA,Split2CV1,0.688069504583553,1.73864735111474
 barley,BaMMV,BayesA,Split3CV1,0.728768152627014,1.62104613790985
