@@ -49,10 +49,7 @@ EasyGeSe loads data from remote sources by default but provides flexible caching
 download_data("barley")
 
 # Load using locally cached data
-X, Y, Z = load_species("barley", use_local=True)
-
-# Specify custom directory for data
-X, Y, Z = load_species("barley", use_local=True, data_dir="/path/to/data")
+X, Y, Z = load_species("barley", use_remote = False)
 ``` 
 ## Benchmark results 
 
@@ -76,14 +73,13 @@ download_benchmark_data()
 | Function | Description |
 |----------|-------------|
 | `list_species()` | Lists available species datasets |
-| `load_species(species)` | Loads X, Y, Z data matrices for a species |
+| `load_species(species, remote=True)` | Loads X, Y, Z data matrices for a species |
 | `list_traits(obj)` | Lists available traits from Y or Z object |
 | `get_cv_indices(z, trait)` | Returns cross-validation indices for a specific trait |
-| `download_data(species, output_dir=None)` | Downloads species data files to local storage |
-| `download_benchmark_data(force=False, output_dir=None)` | Downloads benchmark data files |
 | `load_benchmark_results(...)` | Loads benchmark results with filtering options |
 | `download_index(force=False)` | Downloads and caches the species index file |
-
+| `download_data(species, output_dir=None)` | Downloads species data files to local storage |
+| `download_benchmark_data(force=False)` | Downloads benchmark data files |
 See function docstrings for detailed parameter information.
 
 ## Citation

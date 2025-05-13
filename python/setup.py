@@ -9,7 +9,8 @@ setup(
     install_requires=[
         "pandas",
         "requests",
-        "appdirs"
+        "appdirs",
+        "tabulate"
     ],
     python_requires='>=3.6',
 )

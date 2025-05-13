@@ -1,25 +1,18 @@
-import json
-import pandas as pd
-import requests
 from pathlib import Path
-import io
-from requests.exceptions import RequestException
+import requests
+import pandas as pd
+import json
 from typing import List, Optional, Union
 from appdirs import user_cache_dir
 
 # Remote location of index file
 INDEX_URL = "https://raw.githubusercontent.com/cquesadat/EasyGeSe/main/datasets/index.json"
 
-# For development
-DEV_CACHE_DIR = Path(__file__).parent / "data"
-if not DEV_CACHE_DIR.exists():
-    DEV_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+# Use a single, consistent cache directory
+CACHE_DIR = Path(user_cache_dir("easygese", "easygese"))
+# Create cache directory if it doesn't exist
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# For released package (platform-appropriate user cache directory)
-USER_CACHE_DIR = Path(user_cache_dir("easygese", "easygese"))
-
-# Select which one to use (development vs production)
-DEFAULT_CACHE_DIR = DEV_CACHE_DIR  # Switch to USER_CACHE_DIR for release
 
 def download_index(force=False):
     """
@@ -31,100 +24,48 @@ def download_index(force=False):
     Returns:
     - Path to the cached index file
     """
-    cache_file = DEFAULT_CACHE_DIR / "index.json"
+    cache_file = CACHE_DIR / "index.json"
     
-    # If cached and not forced, skip download
+    # Use cached version if available and not forcing refresh
     if cache_file.exists() and not force:
-        print("Using cached index file")
         return cache_file
         
-    # Download fresh copy
     try:
         print("Downloading index file...")
         response = requests.get(INDEX_URL, timeout=10)
         response.raise_for_status()
         
-        # Create the cache directory if needed
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        
         # Save to cache
         with open(cache_file, "w") as f:
-            json.dump(response.json(), f, indent=2)
+            f.write(response.text)
             
         print(f"Index file cached at {cache_file}")
         return cache_file
-    except RequestException as e:
-        print(f"Failed to download index: {e}")
+    except Exception as e:
+        print(f"Error downloading index: {e}")
         if cache_file.exists():
             print("Using existing cached index")
             return cache_file
         raise
 
-def load_index(use_cache=True, force_refresh=False, local_fallback=True, local_path=None):
+def load_index(force_refresh=False):
     """
-    Load the index.json from cache, remote GitHub repo, or local fallback.
+    Load the index.json from cache or remote GitHub repo.
     
     Parameters:
-    - use_cache (bool): If True, try to use cached index file first
     - force_refresh (bool): If True, force re-download of index
-    - local_fallback (bool): If True, attempt to load from local path when remote fails
-    - local_path (str): Optional path to local index.json. If None, will check common locations
     
     Returns:
     - The loaded index as a dictionary
     """
-    cache_file = DEFAULT_CACHE_DIR / "index.json"
+    cache_file = download_index(force=force_refresh)
     
-    # Try cache first if requested
-    if use_cache and not force_refresh and cache_file.exists():
-        try:
-            with open(cache_file, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            print("Cached index file is corrupt. Downloading fresh copy.")
-    
-    # Download or refresh if needed
-    if force_refresh or not cache_file.exists():
-        try:
-            download_index(force=force_refresh)
-            with open(cache_file, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            if not local_fallback:
-                raise RuntimeError("Failed to download index and local fallback disabled.") from e
-    
-    # Try remote if not already tried
-    if not use_cache:
-        try:
-            response = requests.get(INDEX_URL, timeout=10)
-            response.raise_for_status()
-            return response.json()
-        except RequestException as e:
-            if not local_fallback:
-                raise RuntimeError("Failed to load index from remote.") from e
-    
-    # Fall back to local paths if all else fails
-    if local_fallback:
-        if local_path:
-            local_file = Path(local_path)
-        else:
-            possible_paths = [
-                Path(__file__).parent.parent.parent.parent / "datasets" / "index.json", 
-                Path.home() / ".easygese" / "index.json",
-                cache_file  # Try the cache one more time
-            ]
-            
-            for path in possible_paths:
-                if path.exists():
-                    local_file = path
-                    break
-            else:
-                raise FileNotFoundError(
-                    "Remote load failed and no local index.json found in standard locations."
-                )
-                
-        with local_file.open("r") as f:
+    try:
+        with open(cache_file, "r") as f:
             return json.load(f)
+    except Exception as e:
+        print(f"Error loading index: {e}")
+        raise
                
 def list_species(verbose=True, detailed=True):
     """
@@ -194,21 +135,21 @@ def download_data(species, output_dir=None):
     
     Parameters:
     - species (str): Species name to download
-    - output_dir (str or Path, optional): Directory to save files. 
-                                         Defaults to ~/.easygese/data/species/
+    - output_dir (str or Path, optional): Directory to save files.
+                                         Defaults to user cache directory
     
     Returns:
     - Path object: Directory containing the downloaded files
     """
     index = load_index()
     if species not in index:
-        raise ValueError(f"Species '{species}' not found in index.")
+        raise ValueError(f"Species '{species}' not found in the index")
         
     # Set up the output directory
     if output_dir is None:
-        output_dir = DEFAULT_CACHE_DIR / species
+        output_dir = CACHE_DIR / species
     else:
-        output_dir = Path(output_dir) / species
+        output_dir = Path(output_dir)
         
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -239,7 +180,7 @@ def download_data(species, output_dir=None):
     print(f"Downloaded {species} data to {output_dir}")
     return output_dir
 
-def load_species(species, use_local=True, data_dir=None):
+def load_species(species, use_remote=True):
     """
     Load the X, Y, and Z datasets for a given species. It outputs three
     different objects, the function should be called as:
@@ -247,60 +188,38 @@ def load_species(species, use_local=True, data_dir=None):
     
     Parameters:
     - species (str): Name of the species to load
-    - use_local (bool): If True, attempt to load from local files first
-    - data_dir (str or Path, optional): Directory to look for data files
-                                       Defaults to ~/.easygese/data/species/
+    - use_remote (bool): If True, always download from remote, otherwise try local cache first
     """
     index = load_index()
     if species not in index:
-        raise ValueError(f"Species '{species}' not found in index.")
+        raise ValueError(f"Species '{species}' not found in the index")
 
-    entry = index[species]
+    species_dir = CACHE_DIR / species
+    local_files_exist = (species_dir.exists() and
+                        (species_dir / "X.csv").exists() and
+                        (species_dir / "Y.csv").exists() and
+                        (species_dir / "Z.json").exists())
     
-    # Check for local files
-    if data_dir is None:
-        data_dir = DEFAULT_CACHE_DIR / species
-    else:
-        data_dir = Path(data_dir) / species
+    # Download data if needed
+    if use_remote or not local_files_exist:
+        download_data(species)
     
-    local_files_exist = (data_dir.exists() and
-                        (data_dir / "X.csv").exists() and
-                        (data_dir / "Y.csv").exists() and
-                        (data_dir / "Z.json").exists())
+    # Load the data
+    X = pd.read_csv(species_dir / "X.csv", index_col=0)
+    X.attrs["_is_easygese_X"] = True
     
-    if use_local and local_files_exist:
-        print(f"Loading {species} from local files at {data_dir}")
-        
-        # Load X from file
-        X = pd.read_csv(data_dir / "X.csv", index_col=0)
-        
-        # Load Y from file
-        Y = pd.read_csv(data_dir / "Y.csv", index_col=0)
-        Y.attrs["_is_easygese_Y"] = True
-        
-        # Load Z from file
-        with open(data_dir / "Z.json", "r") as f:
-            Z = json.load(f)
-        Z["_is_easygese_Z"] = True
-    else:
-        # Original remote loading code
-        print("Please cite:")
-        print(entry["citation"])
-
-        response_X = requests.get(entry["X"])
-        response_X.raise_for_status()  
-        X = pd.read_csv(io.StringIO(response_X.text), index_col=0)  
-
-        response_Y = requests.get(entry["Y"])
-        response_Y.raise_for_status()
-        Y = pd.read_csv(io.StringIO(response_Y.text), index_col=0)
-        Y.attrs["_is_easygese_Y"] = True
-
-        response_Z = requests.get(entry["Z"])
-        response_Z.raise_for_status()
-        Z = response_Z.json()
-        Z["_is_easygese_Z"] = True 
-
+    Y = pd.read_csv(species_dir / "Y.csv", index_col=0)
+    Y.attrs["_is_easygese_Y"] = True
+    
+    with open(species_dir / "Z.json", "r") as f:
+        Z = json.load(f)
+    Z["_is_easygese_Z"] = True
+    
+    # Print citation info
+    if "citation" in index[species]:
+        print(f"\nCitation for {species} dataset:")
+        print(index[species]["citation"])
+    
     return X, Y, Z
 
 def list_traits(obj):
@@ -343,14 +262,12 @@ def get_cv_indices(z, trait):
     df.index.name = "Genotype"
     return df
 
-def download_benchmark_data(force=False, output_dir=None):
+def download_benchmark_data(force=False):
     """
     Download benchmark result files to local cache.
     
     Parameters:
     - force (bool): If True, force re-download even if cache exists
-    - output_dir (str or Path, optional): Directory to save files.
-                                         Defaults to package cache directory.
     
     Returns:
     - Path object: Directory containing the downloaded files
@@ -359,12 +276,8 @@ def download_benchmark_data(force=False, output_dir=None):
     base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
     
     # Set up the output directory
-    if output_dir is None:
-        output_dir = DEFAULT_CACHE_DIR / "benchmarks"
-    else:
-        output_dir = Path(output_dir)
-        
-    output_dir.mkdir(parents=True, exist_ok=True)
+    benchmark_dir = CACHE_DIR / "benchmarks"
+    benchmark_dir.mkdir(parents=True, exist_ok=True)
     
     # Define benchmark files to download
     benchmark_files = {
@@ -372,54 +285,34 @@ def download_benchmark_data(force=False, output_dir=None):
         "results_summary.csv": base_url + "results_summary.csv"
     }
     
-    files_downloaded = []
-    
     for filename, url in benchmark_files.items():
-        output_file = output_dir / filename
-        
-        # Skip if cached and not forced
+        output_file = benchmark_dir / filename
         if output_file.exists() and not force:
             print(f"Using cached {filename}")
             continue
             
-        # Download the file
+        print(f"Downloading {filename}...")
         try:
-            print(f"Downloading {filename}...")
             response = requests.get(url)
             response.raise_for_status()
-            
             with open(output_file, "wb") as f:
                 f.write(response.content)
-                
-            files_downloaded.append(filename)
-        except RequestException as e:
-            print(f"Failed to download {filename}: {e}")
-            if not output_file.exists():
-                print(f"Warning: {filename} not available locally")
+        except Exception as e:
+            print(f"Error downloading {filename}: {e}")
     
-    if files_downloaded:
-        print(f"Downloaded {len(files_downloaded)} benchmark files to {output_dir}")
-    
-    return output_dir
+    return benchmark_dir
 
 def load_benchmark_results(
-    file_path: str = None,
-    species: Optional[Union[str, List[str]]] = None,
-    traits: Optional[Union[str, List[str]]] = None,
-    models: Optional[Union[str, List[str]]] = None,
-    summarize: bool = True,
-    validate_combinations: bool = True,
-    use_cache: bool = True,
-    force_download: bool = False
-) -> pd.DataFrame:
+    species=None,
+    traits=None,
+    models=None,
+    summarize=True
+):
     """
-    Load benchmark results from a CSV file.
+    Load benchmark results, downloading if necessary.
     
     Parameters:
     -----------
-    file_path : str, optional
-        Path to the CSV file containing the benchmark results.
-        If None, uses the default package data files.
     species : str or list of str, optional
         Species to filter by (e.g., "barley", "bean", "lentil").
     traits : str or list of str, optional
@@ -427,57 +320,25 @@ def load_benchmark_results(
     models : str or list of str, optional
         Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost").
     summarize : bool
-        Whether to summarize results by averaging over CV splits.
-    validate_combinations : bool
-        Whether to validate that requested species-trait combinations exist.
-    use_cache : bool
-        If True, try to use cached benchmark files first.
-    force_download : bool
-        If True, force re-download of benchmark files.
+        Whether to use summarized results (True) or raw results (False).
         
     Returns:
     --------
     pandas.DataFrame
         DataFrame containing the benchmark results, filtered as specified.
     """
-        # Determine which file to use based on the summarize parameter
+    # Determine which file to use
     filename = "results_summary.csv" if summarize else "results_raw.csv"
+    benchmark_dir = CACHE_DIR / "benchmarks"
+    file_path = benchmark_dir / filename
     
-    # If a specific file path was provided, use it directly
-    if file_path is not None:
-        path_to_use = Path(file_path)
-    else:
-        # Try to use cached files if requested
-        cache_dir = DEFAULT_CACHE_DIR / "benchmarks"
-        cache_file = cache_dir / filename
-        
-        if use_cache:
-            # Download if forced or if file doesn't exist
-            if force_download or not cache_file.exists():
-                download_benchmark_data(force=force_download)
-            
-            # If cache file exists after potential download, use it
-            if cache_file.exists():
-                path_to_use = cache_file
-                print(f"Using cached benchmark file: {filename}")
-            else:
-                # Fall back to package data directory
-                path_to_use = Path(__file__).parent / "data" / filename
-                print(f"Using package benchmark file: {filename}")
-        else:
-            # Use package data directory if not using cache
-            path_to_use = Path(__file__).parent / "data" / filename
-            print(f"Using package benchmark file: {filename}")
-    
-    # Check if the file exists
-    if not path_to_use.exists():
-        raise FileNotFoundError(f"Benchmark file not found: {path_to_use}")
+    # Download if needed
+    if not file_path.exists():
+        benchmark_dir = download_benchmark_data()
+        file_path = benchmark_dir / filename
     
     # Load the CSV file
-    df = pd.read_csv(path_to_use)
-    
-    # Store original data for validation
-    original_df = df.copy()
+    df = pd.read_csv(file_path)
     
     # Convert single values to lists for consistent filtering
     if isinstance(species, str):
@@ -487,46 +348,12 @@ def load_benchmark_results(
     if isinstance(models, str):
         models = [models]
     
-    # Validate species-trait combinations if requested
-    if validate_combinations and species is not None and traits is not None:
-        # Get all valid species-trait combinations in the data
-        valid_combos = set(zip(original_df['species'], original_df['trait']))
-        
-        # Check if requested combinations exist
-        requested_combos = [(sp, trait) for sp in species for trait in traits]
-        valid_requested = [combo in valid_combos for combo in requested_combos]
-        
-        if not all(valid_requested):
-            invalid_combos = [combo for i, combo in enumerate(requested_combos) if not valid_requested[i]]
-            print(f"Warning: The following species-trait combinations don't exist in the data:")
-            for sp, trait in invalid_combos:
-                print(f"  - {sp}: {trait}")
-            
-            # Show available traits for each requested species
-            print("\nAvailable traits per species:")
-            for sp in species:
-                available_traits = original_df[original_df['species'] == sp]['trait'].unique()
-                print(f"  - {sp}: {', '.join(available_traits)}")
-    
     # Apply filters if provided
     if species is not None:
-        df = df[df['species'].isin(species)]
+        df = df[df["Species"].isin(species)]
     if traits is not None:
-        df = df[df['trait'].isin(traits)]
+        df = df[df["Trait"].isin(traits)]
     if models is not None:
-        df = df[df['model'].isin(models)]
-    
-    # If we're not using the pre-summarized file, summarize now if requested
-    if summarize and 'CV_split' in df.columns:
-        # Group by species, trait, model and compute mean and std for correlation and RMSE
-        df = df.groupby(['species', 'trait', 'model']).agg({
-            'correlation': ['mean', 'std'],
-            'RMSE': ['mean', 'std']
-        }).reset_index()
-        
-        # Flatten multi-level column names
-        df.columns = ['species', 'trait', 'model', 
-                     'correlation_mean', 'correlation_std', 
-                     'RMSE_mean', 'RMSE_std']
+        df = df[df["Model"].isin(models)]
     
     return df
