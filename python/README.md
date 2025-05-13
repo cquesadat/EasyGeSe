@@ -30,14 +30,6 @@ traits = list_traits(Y)  # or list_traits(Z)
 
 # Get CV indices for a specific trait
 cv_indices = get_cv_indices(Z, traits[0])
-
-# Download data for offline use
-from easygese import download_data
-download_data("bean")
-
-# Load benchmark results for a species
-from easygese import load_benchmark_results
-results = load_benchmark_results(species="bean")
 ```
 
 ## Data Access
@@ -45,27 +37,40 @@ results = load_benchmark_results(species="bean")
 EasyGeSe loads data from remote sources by default but provides flexible caching options:
 
 ```python
-# Download species data locally for offline use
-download_data("barley")
+# Load data (tries online sources first, falls back to local cache)
+X, Y, Z = load_species("bean")
 
-# Load using locally cached data
-X, Y, Z = load_species("barley", use_remote = False)
+# Explicitly download data to default cache directory
+X, Y, Z = load_species("bean", download=True)
+
+# Explicitly download to a custom directory
+X, Y, Z = load_species("bean", download=True, download_dir="./my_data")
+
+# Download data separately for offline use
+download_data("barley") # default cache 
+download_data("barley", output_dir="./my_data") #custom directory
 ``` 
 ## Benchmark results 
 
 Access pre-computed model benchmark results across multiple species and tratis. Quiddities of the benchmarking process are described in detail in the paper
 
 ```python
-# Get all benchmark results
+# Get all benchmark results (loads from online by default)
 results = load_benchmark_results()
 
 # Filter results by species, traits, and/or models
 bean_results = load_benchmark_results(species="bean")
 model_comparison = load_benchmark_results(models=["GBLUP", "XGBoost"])
-trait_results = load_benchmark_results(species="barley", traits=["BaMMV"])
+trait_results = load_benchmark_results(species="barley", traits=["DF"])
 
-# Download benchmark data for offline use
-download_benchmark_data()
+# Explicitly download benchmark data
+results = load_benchmark_results(download=True)
+
+# Download to custom directory
+results = load_benchmark_results(download=True, download_dir="./my_data")
+
+# Use raw results instead of summary results
+raw_results = load_benchmark_results(summarize=False)
 ``` 
 
 ## Functions
@@ -73,7 +78,7 @@ download_benchmark_data()
 | Function | Description |
 |----------|-------------|
 | `list_species()` | Lists available species datasets |
-| `load_species(species, remote=True)` | Loads X, Y, Z data matrices for a species |
+| `load_species(species, download=False, download_dir=None)` | Loads X, Y, Z data matrices for a species |
 | `list_traits(obj)` | Lists available traits from Y or Z object |
 | `get_cv_indices(z, trait)` | Returns cross-validation indices for a specific trait |
 | `load_benchmark_results(...)` | Loads benchmark results with filtering options |
