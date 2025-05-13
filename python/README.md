@@ -84,7 +84,7 @@ raw_results = load_benchmark_results(summarize=False)
 | `load_benchmark_results(...)` | Loads benchmark results with filtering options |
 | `download_index(force=False)` | Downloads and caches the species index file |
 | `download_data(species, output_dir=None)` | Downloads species data files to local storage |
-| `download_benchmark_data(force=False)` | Downloads benchmark data files |
+| `download_benchmark_data(output_dir=None, force=False)` | Downloads benchmark data files |
 See function docstrings for detailed parameter information.
 
 ## Citation

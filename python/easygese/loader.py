@@ -132,6 +132,7 @@ def list_species(verbose=True, detailed=True):
 def download_data(species, output_dir=None):
     """
     Download raw data files for a species to a local directory.
+    Files are saved with species prefix (e.g., beanX.csv).
     
     Parameters:
     - species (str): Species name to download
@@ -147,35 +148,51 @@ def download_data(species, output_dir=None):
         
     # Set up the output directory
     if output_dir is None:
-        output_dir = CACHE_DIR / species
+        output_dir = CACHE_DIR
     else:
         output_dir = Path(output_dir)
         
     output_dir.mkdir(parents=True, exist_ok=True)
     
     entry = index[species]
+    
+    # Define filenames with species prefix
+    x_filename = f"{species}X.csv"
+    y_filename = f"{species}Y.csv"
+    z_filename = f"{species}Z.json"
+    
+    # Check if files already exist
+    x_exists = (output_dir / x_filename).exists()
+    y_exists = (output_dir / y_filename).exists()
+    z_exists = (output_dir / z_filename).exists()
+    
+    if x_exists and y_exists and z_exists:
+        print(f"All files for {species} already exist in {output_dir}")
+        return output_dir
+    
     print(f"Downloading {species} data files...")
     
-    # Download X (genotype) data
-    print("Downloading X (genotype) data...")
-    response = requests.get(entry["X"])
-    response.raise_for_status()
-    with open(output_dir / "X.csv", "wb") as f:
-        f.write(response.content)
+    # Download only missing files
+    if not x_exists:
+        print(f"Downloading {x_filename}...")
+        response = requests.get(entry["X"])
+        response.raise_for_status()
+        with open(output_dir / x_filename, "wb") as f:
+            f.write(response.content)
     
-    # Download Y (phenotype) data
-    print("Downloading Y (phenotype) data...")
-    response = requests.get(entry["Y"])
-    response.raise_for_status()
-    with open(output_dir / "Y.csv", "wb") as f:
-        f.write(response.content)
+    if not y_exists:
+        print(f"Downloading {y_filename}...")
+        response = requests.get(entry["Y"])
+        response.raise_for_status()
+        with open(output_dir / y_filename, "wb") as f:
+            f.write(response.content)
     
-    # Download Z (CV splits) data
-    print("Downloading Z (CV splits) data...")
-    response = requests.get(entry["Z"])
-    response.raise_for_status()
-    with open(output_dir / "Z.json", "wb") as f:
-        f.write(response.content)
+    if not z_exists:
+        print(f"Downloading {z_filename}...")
+        response = requests.get(entry["Z"])
+        response.raise_for_status()
+        with open(output_dir / z_filename, "wb") as f:
+            f.write(response.content)
     
     print(f"Downloaded {species} data to {output_dir}")
     return output_dir
@@ -196,57 +213,74 @@ def load_species(species, download=False, download_dir=None):
     if species not in index:
         raise ValueError(f"Species '{species}' not found in the index")
 
-    # Determine paths
-    species_dir = CACHE_DIR / species if download_dir is None else Path(download_dir)
+    # Define filenames with species prefix
+    x_filename = f"{species}X.csv"
+    y_filename = f"{species}Y.csv"
+    z_filename = f"{species}Z.json"
     
-    if download:
-        # User explicitly requested download
-        download_data(species, output_dir=download_dir)
+    # Determine directory to use
+    data_dir = Path(download_dir) if download_dir else CACHE_DIR
     
-    # First try to load from online sources
-    try:
-        # Get the URLs from the index
-        entry = index[species]
-        
-        print("Loading data from online sources...")
-        # Load X (genotype) data directly from URL
-        X = pd.read_csv(entry["X"], index_col=0)
+    # Check if files exist in the specified directory
+    files_exist = (data_dir.exists() and
+                  (data_dir / x_filename).exists() and
+                  (data_dir / y_filename).exists() and
+                  (data_dir / z_filename).exists())
+    
+    # If files exist locally, load them directly
+    if files_exist:
+        print(f"Loading data from {data_dir}...")
+        X = pd.read_csv(data_dir / x_filename, index_col=0)
         X.attrs["_is_easygese_X"] = True
         
-        # Load Y (phenotype) data directly from URL
-        Y = pd.read_csv(entry["Y"], index_col=0)
+        Y = pd.read_csv(data_dir / y_filename, index_col=0)
         Y.attrs["_is_easygese_Y"] = True
         
-        # Load Z (CV splits) data directly from URL
-        response = requests.get(entry["Z"])
-        response.raise_for_status()
-        Z = json.loads(response.text)
-        Z["_is_easygese_Z"] = True
-        
-    except Exception as e:
-        print(f"Failed to load data from online source: {e}")
-        
-        # Check if files exist locally
-        local_files_exist = (species_dir.exists() and
-                           (species_dir / "X.csv").exists() and
-                           (species_dir / "Y.csv").exists() and
-                           (species_dir / "Z.json").exists())
-        
-        if not local_files_exist:
-            print("No local data found and online loading failed.")
-            raise
-        
-        print("Loading data from local cache...")
-        # Load from local cache
-        X = pd.read_csv(species_dir / "X.csv", index_col=0)
-        X.attrs["_is_easygese_X"] = True
-        
-        Y = pd.read_csv(species_dir / "Y.csv", index_col=0)
-        Y.attrs["_is_easygese_Y"] = True
-        
-        with open(species_dir / "Z.json", "r") as f:
+        with open(data_dir / z_filename, "r") as f:
             Z = json.load(f)
         Z["_is_easygese_Z"] = True
+    
+    # If files don't exist and download is requested, download them
+    elif download:
+        print(f"Files not found in {data_dir}. Downloading...")
+        download_data(species, output_dir=data_dir)
+        
+        # Now load from the downloaded files
+        X = pd.read_csv(data_dir / x_filename, index_col=0)
+        X.attrs["_is_easygese_X"] = True
+        
+        Y = pd.read_csv(data_dir / y_filename, index_col=0)
+        Y.attrs["_is_easygese_Y"] = True
+        
+        with open(data_dir / z_filename, "r") as f:
+            Z = json.load(f)
+        Z["_is_easygese_Z"] = True
+    
+    # If files don't exist and download not requested, try online loading
+    else:
+        try:
+            # Get the URLs from the index
+            entry = index[species]
+            
+            print("Loading data from online sources...")
+            # Load X (genotype) data directly from URL
+            X = pd.read_csv(entry["X"], index_col=0)
+            X.attrs["_is_easygese_X"] = True
+            
+            # Load Y (phenotype) data directly from URL
+            Y = pd.read_csv(entry["Y"], index_col=0)
+            Y.attrs["_is_easygese_Y"] = True
+            
+            # Load Z (CV splits) data directly from URL
+            response = requests.get(entry["Z"])
+            response.raise_for_status()
+            Z = json.loads(response.text)
+            Z["_is_easygese_Z"] = True
+            
+        except Exception as e:
+            print(f"Failed to load data from online source: {e}")
+            print(f"No local data found at {data_dir} and online loading failed.")
+            raise
     
     # Print citation info
     if "citation" in index[species]:
@@ -295,11 +329,13 @@ def get_cv_indices(z, trait):
     df.index.name = "Genotype"
     return df
 
-def download_benchmark_data(force=False):
+def download_benchmark_data(output_dir=None, force=False):
     """
-    Download benchmark result files to local cache.
+    Download benchmark result files to local storage.
     
     Parameters:
+    - output_dir (str or Path, optional): Directory to save files.
+                                         Defaults to user cache directory
     - force (bool): If True, force re-download even if cache exists
     
     Returns:
@@ -309,8 +345,12 @@ def download_benchmark_data(force=False):
     base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
     
     # Set up the output directory
-    benchmark_dir = CACHE_DIR / "benchmarks"
-    benchmark_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir is None:
+        output_dir = CACHE_DIR
+    else:
+        output_dir = Path(output_dir)
+        
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Define benchmark files to download
     benchmark_files = {
@@ -318,8 +358,20 @@ def download_benchmark_data(force=False):
         "results_summary.csv": base_url + "results_summary.csv"
     }
     
+    # Check if files already exist
+    all_exist = True
+    for filename in benchmark_files:
+        if not (output_dir / filename).exists():
+            all_exist = False
+            break
+    
+    if all_exist and not force:
+        print(f"All benchmark files already exist in {output_dir}")
+        return output_dir
+    
+    # Download files (only missing ones if not forcing)
     for filename, url in benchmark_files.items():
-        output_file = benchmark_dir / filename
+        output_file = output_dir / filename
         if output_file.exists() and not force:
             print(f"Using cached {filename}")
             continue
@@ -333,7 +385,7 @@ def download_benchmark_data(force=False):
         except Exception as e:
             print(f"Error downloading {filename}: {e}")
     
-    return benchmark_dir
+    return output_dir
 
 def load_benchmark_results(
     species=None,
@@ -344,7 +396,7 @@ def load_benchmark_results(
     download_dir=None
 ):
     """
-    Load benchmark results, prioritizing online sources first.
+    Load benchmark results, checking local files first before online sources.
     
     Parameters:
     -----------
@@ -373,38 +425,35 @@ def load_benchmark_results(
     base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
     file_url = base_url + filename
     
-    # Set benchmark directory
-    benchmark_dir = Path(download_dir) if download_dir else (CACHE_DIR / "benchmarks")
+    # Determine directory to use
+    data_dir = Path(download_dir) if download_dir else CACHE_DIR
     
-    if download:
-        # User explicitly requested download
-        benchmark_dir.mkdir(parents=True, exist_ok=True)
-        output_file = benchmark_dir / filename
-        
-        print(f"Downloading {filename}...")
-        try:
-            response = requests.get(file_url)
-            response.raise_for_status()
-            with open(output_file, "wb") as f:
-                f.write(response.content)
-        except Exception as e:
-            print(f"Error downloading {filename}: {e}")
+    # Check if file exists locally
+    file_path = data_dir / filename
+    file_exists = file_path.exists()
     
-    # First try to load directly from online source
-    try:
-        print(f"Loading {filename} from online source...")
-        df = pd.read_csv(file_url)
-    except Exception as e:
-        print(f"Failed to load from online source: {e}")
-        
-        # Try to load from local files
-        file_path = benchmark_dir / filename
-        if not file_path.exists():
-            print(f"Local file not found at {file_path}")
-            raise
-        
-        print(f"Loading {filename} from local cache...")
+    # If file exists locally, load it directly
+    if file_exists:
+        print(f"Loading {filename} from {data_dir}...")
         df = pd.read_csv(file_path)
+    
+    # If file doesn't exist and download is requested, download it
+    elif download:
+        print(f"File not found in {data_dir}. Downloading...")
+        download_benchmark_data(output_dir=data_dir)
+        
+        # Now load the downloaded file
+        df = pd.read_csv(data_dir / filename)
+    
+    # If file doesn't exist and download not requested, try online loading
+    else:
+        try:
+            print(f"Loading {filename} from online source...")
+            df = pd.read_csv(file_url)
+        except Exception as e:
+            print(f"Failed to load from online source: {e}")
+            print(f"No local file found at {file_path} and online loading failed.")
+            raise
     
     # Convert single values to lists for consistent filtering
     if isinstance(species, str):
@@ -414,12 +463,14 @@ def load_benchmark_results(
     if isinstance(models, str):
         models = [models]
     
-    # Apply filters if provided
-    if species is not None:
-        df = df[df["Species"].isin(species)]
-    if traits is not None:
-        df = df[df["Trait"].isin(traits)]
-    if models is not None:
-        df = df[df["Model"].isin(models)]
+    # Apply filters if provided - use case-insensitive column names
+    columns_lower = {col.lower(): col for col in df.columns}
+    
+    if species is not None and "species" in columns_lower:
+        df = df[df[columns_lower["species"]].isin(species)]
+    if traits is not None and "trait" in columns_lower:
+        df = df[df[columns_lower["trait"]].isin(traits)]
+    if models is not None and "model" in columns_lower:
+        df = df[df[columns_lower["model"]].isin(models)]
     
     return df
