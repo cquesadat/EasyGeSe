@@ -15,7 +15,7 @@ def test_functionality():
     
     # Test downloading a small dataset
     print("\n--- Testing download_data() ---")
-    test_species = species_list[0]  # Use the first species in the list
+    test_species = species_list[1] 
     species_dir = download_data(test_species)
     print(f"Downloaded data to: {species_dir}")
     print(f"Files exist: {(species_dir / 'X.csv').exists()}, {(species_dir / 'Y.csv').exists()}, {(species_dir / 'Z.json').exists()}")

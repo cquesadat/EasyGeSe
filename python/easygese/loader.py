@@ -180,7 +180,7 @@ def download_data(species, output_dir=None):
     print(f"Downloaded {species} data to {output_dir}")
     return output_dir
 
-def load_species(species, use_remote=True):
+def load_species(species, download=False, download_dir=None):
     """
     Load the X, Y, and Z datasets for a given species. It outputs three
     different objects, the function should be called as:
@@ -188,32 +188,65 @@ def load_species(species, use_remote=True):
     
     Parameters:
     - species (str): Name of the species to load
-    - use_remote (bool): If True, always download from remote, otherwise try local cache first
+    - download (bool): If True, download data to local storage
+    - download_dir (str or Path, optional): Directory to save files if downloading.
+                                           Defaults to user cache directory
     """
     index = load_index()
     if species not in index:
         raise ValueError(f"Species '{species}' not found in the index")
 
-    species_dir = CACHE_DIR / species
-    local_files_exist = (species_dir.exists() and
-                        (species_dir / "X.csv").exists() and
-                        (species_dir / "Y.csv").exists() and
-                        (species_dir / "Z.json").exists())
+    # Determine paths
+    species_dir = CACHE_DIR / species if download_dir is None else Path(download_dir)
     
-    # Download data if needed
-    if use_remote or not local_files_exist:
-        download_data(species)
+    if download:
+        # User explicitly requested download
+        download_data(species, output_dir=download_dir)
     
-    # Load the data
-    X = pd.read_csv(species_dir / "X.csv", index_col=0)
-    X.attrs["_is_easygese_X"] = True
-    
-    Y = pd.read_csv(species_dir / "Y.csv", index_col=0)
-    Y.attrs["_is_easygese_Y"] = True
-    
-    with open(species_dir / "Z.json", "r") as f:
-        Z = json.load(f)
-    Z["_is_easygese_Z"] = True
+    # First try to load from online sources
+    try:
+        # Get the URLs from the index
+        entry = index[species]
+        
+        print("Loading data from online sources...")
+        # Load X (genotype) data directly from URL
+        X = pd.read_csv(entry["X"], index_col=0)
+        X.attrs["_is_easygese_X"] = True
+        
+        # Load Y (phenotype) data directly from URL
+        Y = pd.read_csv(entry["Y"], index_col=0)
+        Y.attrs["_is_easygese_Y"] = True
+        
+        # Load Z (CV splits) data directly from URL
+        response = requests.get(entry["Z"])
+        response.raise_for_status()
+        Z = json.loads(response.text)
+        Z["_is_easygese_Z"] = True
+        
+    except Exception as e:
+        print(f"Failed to load data from online source: {e}")
+        
+        # Check if files exist locally
+        local_files_exist = (species_dir.exists() and
+                           (species_dir / "X.csv").exists() and
+                           (species_dir / "Y.csv").exists() and
+                           (species_dir / "Z.json").exists())
+        
+        if not local_files_exist:
+            print("No local data found and online loading failed.")
+            raise
+        
+        print("Loading data from local cache...")
+        # Load from local cache
+        X = pd.read_csv(species_dir / "X.csv", index_col=0)
+        X.attrs["_is_easygese_X"] = True
+        
+        Y = pd.read_csv(species_dir / "Y.csv", index_col=0)
+        Y.attrs["_is_easygese_Y"] = True
+        
+        with open(species_dir / "Z.json", "r") as f:
+            Z = json.load(f)
+        Z["_is_easygese_Z"] = True
     
     # Print citation info
     if "citation" in index[species]:
@@ -306,10 +339,12 @@ def load_benchmark_results(
     species=None,
     traits=None,
     models=None,
-    summarize=True
+    summarize=True,
+    download=False,
+    download_dir=None
 ):
     """
-    Load benchmark results, downloading if necessary.
+    Load benchmark results, prioritizing online sources first.
     
     Parameters:
     -----------
@@ -321,6 +356,10 @@ def load_benchmark_results(
         Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost").
     summarize : bool
         Whether to use summarized results (True) or raw results (False).
+    download : bool
+        If True, explicitly download data to local storage.
+    download_dir : str or Path, optional
+        Directory to save files if downloading. Defaults to cache directory.
         
     Returns:
     --------
@@ -329,16 +368,43 @@ def load_benchmark_results(
     """
     # Determine which file to use
     filename = "results_summary.csv" if summarize else "results_raw.csv"
-    benchmark_dir = CACHE_DIR / "benchmarks"
-    file_path = benchmark_dir / filename
     
-    # Download if needed
-    if not file_path.exists():
-        benchmark_dir = download_benchmark_data()
+    # Base GitHub URL (derived from index URL)
+    base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
+    file_url = base_url + filename
+    
+    # Set benchmark directory
+    benchmark_dir = Path(download_dir) if download_dir else (CACHE_DIR / "benchmarks")
+    
+    if download:
+        # User explicitly requested download
+        benchmark_dir.mkdir(parents=True, exist_ok=True)
+        output_file = benchmark_dir / filename
+        
+        print(f"Downloading {filename}...")
+        try:
+            response = requests.get(file_url)
+            response.raise_for_status()
+            with open(output_file, "wb") as f:
+                f.write(response.content)
+        except Exception as e:
+            print(f"Error downloading {filename}: {e}")
+    
+    # First try to load directly from online source
+    try:
+        print(f"Loading {filename} from online source...")
+        df = pd.read_csv(file_url)
+    except Exception as e:
+        print(f"Failed to load from online source: {e}")
+        
+        # Try to load from local files
         file_path = benchmark_dir / filename
-    
-    # Load the CSV file
-    df = pd.read_csv(file_path)
+        if not file_path.exists():
+            print(f"Local file not found at {file_path}")
+            raise
+        
+        print(f"Loading {filename} from local cache...")
+        df = pd.read_csv(file_path)
     
     # Convert single values to lists for consistent filtering
     if isinstance(species, str):
