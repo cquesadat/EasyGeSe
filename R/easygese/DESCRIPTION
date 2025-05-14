@@ -1,0 +1,19 @@
+Package: easygese
+Title: Package with functions to load and explore EasyGeSe data
+Version: 0.1.0
+Authors@R:c(
+    person("Carles", "Quesada-Traver", , "carles.quesadatraver@usys.ethz.ch", role = c("aut", "cre")),
+    person("Daniel", "Ariza-Suarez", , "daniel.arizasuarez@usys.ethz.ch", role = c("aut")),
+    person("Bruno", "Studer", , "bruno.studer@usys.ethz.ch", role = c("ctb")),
+    person("Steven", "Yates", , "steven.yates@usys.ethz.ch", role = c("aut")))
+Description: Tools for loading, processing, and analyzing EasyGeSe data and benchmarks. More information on the dataset in the associated paper.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    rappdirs,
+    httr,
+    jsonlite,
+    knitr,
+    utils

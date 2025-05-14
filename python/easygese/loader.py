@@ -321,9 +321,16 @@ def get_cv_indices(z, trait):
     Returns:
     - pd.DataFrame with 0/1 values for splits
     """
-    if trait not in z:
-        raise ValueError(f"Trait '{trait}' not found. Available traits: {', '.join(z.keys())}")
+    # Validate that this is a proper EasyGeSe Z object
+    if not isinstance(z, dict) or z.get("_is_easygese_Z") is not True:
+        raise TypeError("The provided object is not a valid EasyGeSe Z object")
+        
+    # Check if the trait exists
+    if trait not in z or trait.startswith("_"):
+        available_traits = [k for k in z.keys() if not k.startswith("_")]
+        raise ValueError(f"Trait '{trait}' not found. Available traits: {', '.join(available_traits)}")
     
+    # Get the trait data and convert to DataFrame
     trait_data = z[trait] 
     df = pd.DataFrame.from_dict(trait_data, orient='index')
     df.index.name = "Genotype"
