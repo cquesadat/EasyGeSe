@@ -157,12 +157,14 @@ download_data <- function(species, output_dir = NULL) {
 #' @return A list containing X, Y, and Z data
 #' @export
 load_species <- function(species, download = FALSE, download_dir = NULL) {
-  index <- load_index()
-  if (!species %in% names(index)) {
-    stop(paste("Species '", species, "' not found in the index", sep = ""))
-  }
+  index <- load_index() # Uses refactored load_index
+  canonical_species_names <- names(index)
+  # species_alias_map can be loaded directly by resolve_species_name_internal if passed as NULL
   
-  # Define filenames with species prefix
+  # Resolve species name
+  species <- resolve_species_name_internal(species, canonical_species_names, species_alias_map = NULL) 
+  
+  # Define filenames with the resolved (canonical) species prefix
   x_filename <- paste0(species, "X.csv")
   y_filename <- paste0(species, "Y.csv")
   z_filename <- paste0(species, "Z.json")
