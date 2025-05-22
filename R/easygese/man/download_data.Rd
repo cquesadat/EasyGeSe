@@ -7,7 +7,9 @@
 download_data(species, output_dir = NULL)
 }
 \arguments{
-\item{species}{Species name to download}
+\item{species}{Character string. The name of the species to load.
+Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+are also accepted. See \code{list_species()} for available canonical names.}
 
 \item{output_dir}{Directory to save files. Defaults to user cache directory}
 }

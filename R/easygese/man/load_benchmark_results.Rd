@@ -9,26 +9,26 @@ load_benchmark_results(
   traits = NULL,
   models = NULL,
   summarize = TRUE,
-  download = FALSE,
-  download_dir = NULL
+  download = FALSE
 )
 }
 \arguments{
-\item{species}{Species to filter by (e.g., "barley", "bean", "lentil")}
+\item{species}{Character string. The name of the species to load.
+Can be a single string or a vector of strings.
+Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+are also accepted. See \code{list_species()} for available canonical names.}
 
-\item{traits}{Traits to filter by (e.g., "BaMMV", "DF", "DTF")}
+\item{traits}{Traits to filter by (e.g., "BaMMV", "DF", "DTF"). Case-sensitive.}
 
-\item{models}{Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost")}
+\item{models}{Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost"). Case-sensitive.}
 
-\item{summarize}{Whether to use summarized results (TRUE) or raw results (FALSE)}
+\item{summarize}{Whether to use summarized results (TRUE) or raw results (FALSE).}
 
-\item{download}{If TRUE, explicitly download data to local storage}
-
-\item{download_dir}{Directory to save files if downloading}
+\item{download}{If TRUE, force re-download of the specific benchmark file being loaded.}
 }
 \value{
-Data frame containing the benchmark results, filtered as specified
+Data frame containing the benchmark results, filtered as specified.
 }
 \description{
-Loads benchmark results from the EasyGeSe GitHub repository.
+Loads benchmark results from local cache, downloading if necessary.
 }
