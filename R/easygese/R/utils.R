@@ -110,13 +110,14 @@ resolve_species_name_internal <- function(species_input, canonical_species_names
   user_input_lower <- tolower(species_input)
   
   if (user_input_lower %in% names(species_alias_map)) {
+    
     canonical_name <- species_alias_map[[user_input_lower]]
-    if (canonical_name %in% canonical_species_names) {
-      return(canonical_name)
-    } else {
-      warning(paste0("Alias '", species_input, "' mapped to '", canonical_name, 
-                     "', which is not a recognized canonical species. Check species_aliases.json and index.json consistency."))
+    
+    if (species_input != canonical_name) {
+      warning(paste0("Alias '", species_input, "' mapped to '", canonical_name, "'.\n'",
+                     species_input, "' is not a recognized canonical species. See list_species() for available canonical names."))
     }
+    return(canonical_name)
   }
   
   pretty_available_options <- paste(shQuote(sort(canonical_species_names)), collapse = ", ")
