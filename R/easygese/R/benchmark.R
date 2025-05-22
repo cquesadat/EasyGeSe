@@ -39,8 +39,10 @@ download_benchmark_data <- function(force = FALSE) {
 #'
 #' Loads benchmark results from local cache, downloading if necessary.
 #' 
-#' @param species Species to filter by (e.g., "barley", "bean", "lentil", or their aliases). 
+#' @param species Character string. The name of the species to load.
 #'                Can be a single string or a vector of strings.
+#'                Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+#'                are also accepted. See `list_species()` for available canonical names. 
 #' @param traits Traits to filter by (e.g., "BaMMV", "DF", "DTF"). Case-sensitive.
 #' @param models Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost"). Case-sensitive.
 #' @param summarize Whether to use summarized results (TRUE) or raw results (FALSE).

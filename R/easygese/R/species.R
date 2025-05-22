@@ -74,7 +74,9 @@ list_species <- function(verbose = TRUE, detailed = TRUE) {
 #'
 #' Downloads the X (genotype), Y (phenotype), and Z (CV splits) datasets for a specified species.
 #' 
-#' @param species Species name to download
+#' @param species Character string. The name of the species to load.
+#'                Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+#'                are also accepted. See `list_species()` for available canonical names.
 #' @param output_dir Directory to save files. Defaults to user cache directory
 #'
 #' @return Path to directory containing the downloaded files
@@ -150,7 +152,9 @@ download_data <- function(species, output_dir = NULL) {
 #' 
 #' Loads the X (genotype), Y (phenotype), and Z (CV splits) datasets for a specified species.
 #'
-#' @param species Name of the species to load
+#' @param species Character string. The name of the species to load.
+#'                Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+#'                are also accepted. See `list_species()` for available canonical names.
 #' @param download If TRUE, download data to local storage
 #' @param download_dir Directory to save files if downloading. Defaults to user cache directory
 #'
