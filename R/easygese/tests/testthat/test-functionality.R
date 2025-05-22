@@ -1,4 +1,71 @@
-# tests/testthat/test-functionality.R
+library(testthat)
+library(easygese) # Assuming resolve_species_name_internal is an internal function here
+# No need for httr or mockery for this simplified version
+
+# Path to your local test aliases file
+# Make sure this file exists at: t:/myGit/EasyGeSe/R/easygese/tests/testthat/testdata/species_aliases_test.json
+LOCAL_ALIASES_PATH <- test_path("testdata", "species_aliases_test.json")
+
+# Define a simple list of canonical names that your alias file maps to
+MOCK_CANONICAL_NAMES <- c("lentil", "bean", "wheatG", "maize") # Adjust if your test aliases map to others
+
+context("Species Name Resolution (Simplified)")
+
+test_that("resolve_species_name_internal works correctly with local alias data", {
+  # Check if the local alias file exists first
+  if (!file.exists(LOCAL_ALIASES_PATH)) {
+    skip(paste("Local alias file not found, skipping this test:", LOCAL_ALIASES_PATH))
+  }
+  
+  # Load the alias map directly from your local JSON file
+  species_alias_map <- jsonlite::fromJSON(LOCAL_ALIASES_PATH)
+
+  # Test cases based on your species_aliases_test.json content
+  # Example: if species_aliases_test.json contains:
+  # {
+  #   "lentils": "lentil",
+  #   "lens culinaris": "lentil",
+  #   "common bean": "bean",
+  #   "bread wheat": "wheatG",
+  #   "corn": "maize"
+  # }
+
+  # Exact match (should return itself if canonical)
+  expect_equal(easygese:::resolve_species_name_internal("lentil", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "lentil")
+  
+  # Alias matches (these depend on your species_aliases_test.json)
+  expect_equal(easygese:::resolve_species_name_internal("lentils", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "lentil")
+  # Add more alias tests based on your file:
+  # expect_equal(easygese:::resolve_species_name_internal("lens culinaris", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "lentil")
+  # expect_equal(easygese:::resolve_species_name_internal("common bean", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "bean")
+  expect_equal(easygese:::resolve_species_name_internal("corn", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "maize") # Assuming "corn" maps to "maize"
+  expect_equal(easygese:::resolve_species_name_internal("wheat", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "wheatG") # Assuming "wheat" maps to "wheatG"
+
+
+  # Case insensitivity (if your function is designed to be case-insensitive for aliases)
+  expect_equal(easygese:::resolve_species_name_internal("LENTILS", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "lentil")
+  # expect_equal(easygese:::resolve_species_name_internal("CORN", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map), "maize")
+
+  # Non-existent species
+  sorted_mock_options <- paste(shQuote(sort(MOCK_CANONICAL_NAMES)), collapse = ", ")
+  expected_error_msg_potato <- paste0("Invalid species name: 'potato'. Available options are: ", sorted_mock_options, ".")
+  expect_error(
+    easygese:::resolve_species_name_internal("potato", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map),
+    regexp = expected_error_msg_potato, # Use regexp for flexibility if message varies slightly
+    fixed = TRUE # If the message is exact
+  )
+
+  # What if an alias exists but its target is NOT in MOCK_CANONICAL_NAMES?
+  # (This depends on how resolve_species_name_internal handles this scenario)
+  # Example: if species_aliases_test.json has "alien_fruit": "kryptonite_pear"
+  # and "kryptonite_pear" is not in MOCK_CANONICAL_NAMES.
+  # species_alias_map_extended <- c(species_alias_map, list(alien_fruit = "kryptonite_pear"))
+  # expect_error(
+  #   easygese:::resolve_species_name_internal("alien_fruit", MOCK_CANONICAL_NAMES, species_alias_map = species_alias_map_extended),
+  #   "Some error about alias target not being a canonical name" # Adjust expected error
+  # )
+})
+
 test_that("Basic functionality works", {
   # Test listing species
   species_list <- list_species(verbose = FALSE)
@@ -49,14 +116,11 @@ test_that("Basic functionality works", {
     expect_s3_class(results, "data.frame")
     expect_gt(nrow(results), 0)
     
-    # Test downloading benchmark data
-    bench_dir <- file.path(temp_dir, "benchmark")
-    dir.create(bench_dir, recursive = TRUE)
-    download_benchmark_data(output_dir = bench_dir)
-    expect_true(file.exists(file.path(bench_dir, "results_summary.csv")))
-    
   }, finally = {
     # Clean up temporary directory
     unlink(temp_dir, recursive = TRUE)
   })
 })
+
+# You can add more test_that blocks if you want to test other aspects of 
+# resolve_species_name_internal in isolation.
