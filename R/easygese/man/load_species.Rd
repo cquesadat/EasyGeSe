@@ -7,7 +7,9 @@
 load_species(species, download = FALSE, download_dir = NULL)
 }
 \arguments{
-\item{species}{Name of the species to load}
+\item{species}{Character string. The name of the species to load.
+Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+are also accepted. See \code{list_species()} for available canonical names.}
 
 \item{download}{If TRUE, download data to local storage}
 

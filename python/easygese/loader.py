@@ -2,11 +2,12 @@ from pathlib import Path
 import requests
 import pandas as pd
 import json
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 from appdirs import user_cache_dir
 
 # Remote location of index file
 INDEX_URL = "https://raw.githubusercontent.com/cquesadat/EasyGeSe/main/datasets/index.json"
+SPECIES_ALIASES_URL = "https://raw.githubusercontent.com/cquesadat/EasyGeSe/main/datasets/species_aliases.json"
 
 # Use a single, consistent cache directory
 CACHE_DIR = Path(user_cache_dir("easygese", "easygese"))
@@ -14,60 +15,98 @@ CACHE_DIR = Path(user_cache_dir("easygese", "easygese"))
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def download_index(force=False):
+# --- Generic Cache and Load Utilities ---
+def _download_cached_file(file_url: str, local_filename: str, force: bool = False) -> Path:
     """
-    Download and cache the index.json file.
-    
-    Parameters:
-    - force (bool): If True, force re-download even if cache exists
-    
-    Returns:
-    - Path to the cached index file
+    Download a file and cache it locally.
+    Returns the path to the cached file.
     """
-    cache_file = CACHE_DIR / "index.json"
+    cache_file_path = CACHE_DIR / local_filename
     
-    # Use cached version if available and not forcing refresh
-    if cache_file.exists() and not force:
-        return cache_file
+    if cache_file_path.exists() and not force:
+        return cache_file_path
         
     try:
-        print("Downloading index file...")
-        response = requests.get(INDEX_URL, timeout=10)
+        print(f"Downloading {local_filename} from {file_url}...")
+        response = requests.get(file_url, timeout=10)
         response.raise_for_status()
         
-        # Save to cache
-        with open(cache_file, "w") as f:
-            f.write(response.text)
+        with open(cache_file_path, "wb") as f: # Use "wb" for binary content
+            f.write(response.content)
             
-        print(f"Index file cached at {cache_file}")
-        return cache_file
+        print(f"{local_filename} cached at {cache_file_path}")
+        return cache_file_path
     except Exception as e:
-        print(f"Error downloading index: {e}")
-        if cache_file.exists():
-            print("Using existing cached index")
-            return cache_file
-        raise
+        print(f"Error downloading {local_filename} from {file_url}: {e}")
+        if cache_file_path.exists():
+            print(f"Using existing cached {local_filename}.")
+            return cache_file_path
+        raise # Re-raise if download fails and no cache available
 
-def load_index(force_refresh=False):
+def _load_cached_json(file_url: str, local_filename: str, force_refresh: bool = False) -> Dict[str, Any]:
     """
-    Load the index.json from cache or remote GitHub repo.
-    
-    Parameters:
-    - force_refresh (bool): If True, force re-download of index
-    
-    Returns:
-    - The loaded index as a dictionary
+    Load a JSON file from cache (downloading if necessary).
     """
-    cache_file = download_index(force=force_refresh)
-    
+    cached_file_path = _download_cached_file(file_url, local_filename, force=force_refresh)
     try:
-        with open(cache_file, "r") as f:
+        with open(cached_file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"Error loading index: {e}")
+        print(f"Error loading JSON from {cached_file_path}: {e}")
         raise
-               
-def list_species(verbose=True, detailed=True):
+
+# --- Specific Loaders for Index and Aliases ---
+def download_index(force: bool = False) -> Path:
+    """
+    Download and cache the index.json file.
+    """
+    return _download_cached_file(INDEX_URL, "index.json", force=force)
+
+def load_index(force_refresh: bool = False) -> Dict[str, Any]:
+    """
+    Load the index.json from cache or remote.
+    """
+    return _load_cached_json(INDEX_URL, "index.json", force_refresh=force_refresh)
+
+def load_species_aliases(force_refresh: bool = False) -> Dict[str, str]:
+    """
+    Load the species_aliases.json from cache or remote.
+    """
+    return _load_cached_json(SPECIES_ALIASES_URL, "species_aliases.json", force_refresh=force_refresh)
+
+# --- Species Name Resolution ---
+def _resolve_species_name(
+    species_input: str,
+    canonical_species_names: List[str],
+    species_alias_map: Optional[Dict[str, str]] = None
+) -> str:
+    """Internal helper to resolve species name using aliases."""
+    if not isinstance(species_input, str):
+        raise TypeError("species_input must be a string.")
+        
+    if species_alias_map is None:
+        species_alias_map = load_species_aliases()
+        
+    user_input_lower = species_input.lower()
+    
+    if user_input_lower in species_alias_map:
+        canonical_name = species_alias_map[user_input_lower]
+        if canonical_name in canonical_species_names:
+            return canonical_name
+        else:
+            # This case indicates an inconsistency between alias file and main index
+            print(f"Warning: Alias '{species_input}' mapped to '{canonical_name}', "
+                  "which is not a recognized canonical species. "
+                  "Check species_aliases.json and index.json consistency.")
+            # Fall through to the general error if the mapped name is not valid
+
+    available_options = ", ".join(sorted([f"'{opt}'" for opt in canonical_species_names]))
+    raise ValueError(
+        f"Invalid species name: '{species_input}'. Available options are: {available_options}."
+    )
+
+# --- Existing Functions (Refactored) ---
+def list_species(verbose: bool = True, detailed: bool = True) -> List[str]:
     """
     List available species datasets with metadata.
 
@@ -91,31 +130,21 @@ def list_species(verbose=True, detailed=True):
         try:
             from tabulate import tabulate
             
-            # Prepare data for table
             rows = []
-            for species in species_list:
-                entry = index[species]
+            for sp_name in species_list: # Changed 'species' to 'sp_name' to avoid conflict
+                entry = index[sp_name]
                 metadata = entry.get("metadata", {})
-                
-                # Get metadata or use placeholders
                 n_markers = metadata.get("n_markers", "?")
                 n_genotypes = metadata.get("n_genotypes", "?")
                 n_traits = metadata.get("n_traits", "?")
-                
-                rows.append([
-                    species, 
-                    n_markers,
-                    n_genotypes,
-                    n_traits
-                ])
+                rows.append([sp_name, n_markers, n_genotypes, n_traits])
             
-            # Create and print table
             headers = ["Species", "Markers", "Genotypes", "Traits"]
             table = tabulate(rows, headers=headers, tablefmt="pretty", colalign=("left", "right", "right", "right"))
             print(table)
         except ImportError:
             print("Install 'tabulate' package for detailed view: pip install tabulate")
-            detailed = False
+            detailed = False # type: ignore
             
     if not detailed:
         for sp in species_list:
@@ -124,12 +153,13 @@ def list_species(verbose=True, detailed=True):
     print("\nUsage examples:")
     print("  from easygese import load_species")
     if species_list:
-        example_species = species_list[1]
-        print(f"  X, Y, Z = load_species('{example_species}')  # Load dataset")
-        print(f"  download_data('{example_species}')           # Download for offline use")
+        example_species_name = species_list[0] if len(species_list) > 0 else "your_species" # More robust example
+        print(f"  X, Y, Z = load_species('{example_species_name}')  # Load dataset")
+        print(f"  download_data('{example_species_name}')           # Download for offline use")
+    return species_list
 
 
-def download_data(species, output_dir=None):
+def download_data(species: str, output_dir: Optional[Union[str, Path]] = None) -> Path:
     """
     Download raw data files for a species to a local directory.
     Files are saved with species prefix (e.g., beanX.csv).
@@ -142,62 +172,61 @@ def download_data(species, output_dir=None):
     Returns:
     - Path object: Directory containing the downloaded files
     """
-    index = load_index()
-    if species not in index:
-        raise ValueError(f"Species '{species}' not found in the index")
+    index_data = load_index()
+    canonical_species_names = list(index_data.keys())
+    # species_alias_map will be loaded by _resolve_species_name if None
+    resolved_species_name = _resolve_species_name(species, canonical_species_names, None)
         
-    # Set up the output directory
+    # Set up the output directory (keeps existing custom output_dir logic)
     if output_dir is None:
-        output_dir = CACHE_DIR
+        current_output_dir = CACHE_DIR
     else:
-        output_dir = Path(output_dir)
+        current_output_dir = Path(output_dir)
         
-    output_dir.mkdir(parents=True, exist_ok=True)
+    current_output_dir.mkdir(parents=True, exist_ok=True)
     
-    entry = index[species]
+    entry = index_data[resolved_species_name]
     
-    # Define filenames with species prefix
-    x_filename = f"{species}X.csv"
-    y_filename = f"{species}Y.csv"
-    z_filename = f"{species}Z.json"
+    # Define filenames with resolved species prefix
+    x_filename = f"{resolved_species_name}X.csv"
+    y_filename = f"{resolved_species_name}Y.csv"
+    z_filename = f"{resolved_species_name}Z.json"
     
-    # Check if files already exist
-    x_exists = (output_dir / x_filename).exists()
-    y_exists = (output_dir / y_filename).exists()
-    z_exists = (output_dir / z_filename).exists()
+    files_to_download = {
+        x_filename: entry["X"],
+        y_filename: entry["Y"],
+        z_filename: entry["Z"]
+    }
     
-    if x_exists and y_exists and z_exists:
-        print(f"All files for {species} already exist in {output_dir}")
-        return output_dir
-    
-    print(f"Downloading {species} data files...")
-    
-    # Download only missing files
-    if not x_exists:
-        print(f"Downloading {x_filename}...")
-        response = requests.get(entry["X"])
-        response.raise_for_status()
-        with open(output_dir / x_filename, "wb") as f:
-            f.write(response.content)
-    
-    if not y_exists:
-        print(f"Downloading {y_filename}...")
-        response = requests.get(entry["Y"])
-        response.raise_for_status()
-        with open(output_dir / y_filename, "wb") as f:
-            f.write(response.content)
-    
-    if not z_exists:
-        print(f"Downloading {z_filename}...")
-        response = requests.get(entry["Z"])
-        response.raise_for_status()
-        with open(output_dir / z_filename, "wb") as f:
-            f.write(response.content)
-    
-    print(f"Downloaded {species} data to {output_dir}")
-    return output_dir
+    all_exist = True
+    for filename_key in files_to_download:
+        if not (current_output_dir / filename_key).exists():
+            all_exist = False
+            break
+            
+    if all_exist: # No force parameter here, if files exist, we assume they are fine
+        print(f"All files for {resolved_species_name} already exist in {current_output_dir}")
+        return current_output_dir
 
-def load_species(species, download=False, download_dir=None):
+    print(f"Downloading {resolved_species_name} data files to {current_output_dir}...")
+    
+    for filename, url in files_to_download.items():
+        file_path = current_output_dir / filename
+        if not file_path.exists(): # Download only if missing
+            print(f"Downloading {filename}...")
+            try:
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                with open(file_path, "wb") as f:
+                    f.write(response.content)
+            except Exception as e:
+                print(f"Error downloading {filename} from {url}: {e}")
+                # Decide if to raise or continue
+    
+    print(f"Downloaded {resolved_species_name} data to {current_output_dir}")
+    return current_output_dir
+
+def load_species(species: str, download: bool = False, download_dir: Optional[Union[str, Path]] = None):
     """
     Load the X, Y, and Z datasets for a given species. It outputs three
     different objects, the function should be called as:
@@ -209,87 +238,73 @@ def load_species(species, download=False, download_dir=None):
     - download_dir (str or Path, optional): Directory to save files if downloading.
                                            Defaults to user cache directory
     """
-    index = load_index()
-    if species not in index:
-        raise ValueError(f"Species '{species}' not found in the index")
+    index_data = load_index()
+    canonical_species_names = list(index_data.keys())
+    # species_alias_map will be loaded by _resolve_species_name if None
+    resolved_species_name = _resolve_species_name(species, canonical_species_names, None)
 
-    # Define filenames with species prefix
-    x_filename = f"{species}X.csv"
-    y_filename = f"{species}Y.csv"
-    z_filename = f"{species}Z.json"
+    # Define filenames with resolved species prefix
+    x_filename = f"{resolved_species_name}X.csv"
+    y_filename = f"{resolved_species_name}Y.csv"
+    z_filename = f"{resolved_species_name}Z.json"
     
-    # Determine directory to use
-    data_dir = Path(download_dir) if download_dir else CACHE_DIR
+    # Determine directory to use (keeps existing custom download_dir logic)
+    data_dir_path = Path(download_dir) if download_dir else CACHE_DIR
     
-    # Check if files exist in the specified directory
-    files_exist = (data_dir.exists() and
-                  (data_dir / x_filename).exists() and
-                  (data_dir / y_filename).exists() and
-                  (data_dir / z_filename).exists())
+    files_exist = (data_dir_path.exists() and
+                  (data_dir_path / x_filename).exists() and
+                  (data_dir_path / y_filename).exists() and
+                  (data_dir_path / z_filename).exists())
     
-    # If files exist locally, load them directly
+    X, Y, Z = None, None, None
+
     if files_exist:
-        print(f"Loading data from {data_dir}...")
-        X = pd.read_csv(data_dir / x_filename, index_col=0)
+        print(f"Loading data for {resolved_species_name} from {data_dir_path}...")
+        X = pd.read_csv(data_dir_path / x_filename, index_col=0)
         X.attrs["_is_easygese_X"] = True
-        
-        Y = pd.read_csv(data_dir / y_filename, index_col=0)
+        Y = pd.read_csv(data_dir_path / y_filename, index_col=0)
         Y.attrs["_is_easygese_Y"] = True
-        
-        with open(data_dir / z_filename, "r") as f:
+        with open(data_dir_path / z_filename, "r", encoding="utf-8") as f:
             Z = json.load(f)
-        Z["_is_easygese_Z"] = True
+        Z["_is_easygese_Z"] = True # type: ignore
     
-    # If files don't exist and download is requested, download them
     elif download:
-        print(f"Files not found in {data_dir}. Downloading...")
-        download_data(species, output_dir=data_dir)
+        print(f"Files for {resolved_species_name} not found in {data_dir_path}. Downloading...")
+        # download_data will use data_dir_path if provided, or CACHE_DIR if download_dir was None
+        download_data(resolved_species_name, output_dir=data_dir_path)
         
-        # Now load from the downloaded files
-        X = pd.read_csv(data_dir / x_filename, index_col=0)
+        X = pd.read_csv(data_dir_path / x_filename, index_col=0)
         X.attrs["_is_easygese_X"] = True
-        
-        Y = pd.read_csv(data_dir / y_filename, index_col=0)
+        Y = pd.read_csv(data_dir_path / y_filename, index_col=0)
         Y.attrs["_is_easygese_Y"] = True
-        
-        with open(data_dir / z_filename, "r") as f:
+        with open(data_dir_path / z_filename, "r", encoding="utf-8") as f:
             Z = json.load(f)
-        Z["_is_easygese_Z"] = True
+        Z["_is_easygese_Z"] = True # type: ignore
     
-    # If files don't exist and download not requested, try online loading
-    else:
+    else: # Try online loading
         try:
-            # Get the URLs from the index
-            entry = index[species]
-            
-            print("Loading data from online sources...")
-            # Load X (genotype) data directly from URL
+            entry = index_data[resolved_species_name]
+            print(f"Loading data for {resolved_species_name} from online sources...")
             X = pd.read_csv(entry["X"], index_col=0)
             X.attrs["_is_easygese_X"] = True
-            
-            # Load Y (phenotype) data directly from URL
             Y = pd.read_csv(entry["Y"], index_col=0)
             Y.attrs["_is_easygese_Y"] = True
-            
-            # Load Z (CV splits) data directly from URL
-            response = requests.get(entry["Z"])
-            response.raise_for_status()
-            Z = json.loads(response.text)
-            Z["_is_easygese_Z"] = True
-            
+            response_z = requests.get(entry["Z"], timeout=10)
+            response_z.raise_for_status()
+            Z = json.loads(response_z.text)
+            Z["_is_easygese_Z"] = True # type: ignore
         except Exception as e:
-            print(f"Failed to load data from online source: {e}")
-            print(f"No local data found at {data_dir} and online loading failed.")
+            print(f"Failed to load data for {resolved_species_name} from online source: {e}")
+            print(f"No local data found at {data_dir_path} and online loading failed.")
             raise
     
-    # Print citation info
-    if "citation" in index[species]:
-        print(f"\nCitation for {species} dataset:")
-        print(index[species]["citation"])
+    if "citation" in index_data[resolved_species_name]:
+        print(f"\nCitation for {resolved_species_name} dataset:")
+        print(index_data[resolved_species_name]["citation"])
     
     return X, Y, Z
 
-def list_traits(obj):
+def list_traits(obj: Union[pd.DataFrame, Dict[str, Any]]) -> List[str]:
     """
     List available traits from either:
     - Z object (dict), where keys are trait names
@@ -308,176 +323,101 @@ def list_traits(obj):
     else:
         raise TypeError("Expected a valid Y (DataFrame) or Z (dict) object from EasyGeSe.")
 
-def get_cv_indices(z, trait):
+def get_cv_indices(z: Dict[str, Any], trait: str) -> pd.DataFrame:
     """
-    Return a pandas DataFrame with 5x5 cross-validation splits for a specific trait.
-    Rows = genotypes, Columns = split labels (e.g. Split1CV1, Split2CV1, ...). If you don't
-    remember the trait name, use `list_traits(z)` to find it.
-    
-    Parameters:
-    - z: the Z object (loaded from JSON)
-    - trait: string, name of the trait
-
-    Returns:
-    - pd.DataFrame with 0/1 values for splits
+    Return a pandas DataFrame with cross-validation splits for a specific trait.
     """
-    # Validate that this is a proper EasyGeSe Z object
     if not isinstance(z, dict) or z.get("_is_easygese_Z") is not True:
         raise TypeError("The provided object is not a valid EasyGeSe Z object")
         
-    # Check if the trait exists
     if trait not in z or trait.startswith("_"):
         available_traits = [k for k in z.keys() if not k.startswith("_")]
         raise ValueError(f"Trait '{trait}' not found. Available traits: {', '.join(available_traits)}")
     
-    # Get the trait data and convert to DataFrame
     trait_data = z[trait] 
-    df = pd.DataFrame.from_dict(trait_data, orient='index')
+    df = pd.DataFrame.from_dict(trait_data, orient='index') # type: ignore
     df.index.name = "Genotype"
     return df
 
-def download_benchmark_data(output_dir=None, force=False):
+
+def download_benchmark_data(force: bool = False) -> Path:
     """
-    Download benchmark result files to local storage.
-    
-    Parameters:
-    - output_dir (str or Path, optional): Directory to save files.
-                                         Defaults to user cache directory
-    - force (bool): If True, force re-download even if cache exists
-    
-    Returns:
-    - Path object: Directory containing the downloaded files
+    Download benchmark result files (results_raw.csv and results_summary.csv)
+    to the central cache directory.
     """
-    # Base GitHub URL (derived from index URL)
-    base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
+    base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/" # Derive base URL
     
-    # Set up the output directory
-    if output_dir is None:
-        output_dir = CACHE_DIR
-    else:
-        output_dir = Path(output_dir)
-        
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Define benchmark files to download
-    benchmark_files = {
+    benchmark_files_info = {
         "results_raw.csv": base_url + "results_raw.csv",
         "results_summary.csv": base_url + "results_summary.csv"
     }
     
-    # Check if files already exist
-    all_exist = True
-    for filename in benchmark_files:
-        if not (output_dir / filename).exists():
-            all_exist = False
-            break
+    for filename, url in benchmark_files_info.items():
+        print(f"Ensuring benchmark file {filename} is cached...")
+        _download_cached_file(url, filename, force=force)
     
-    if all_exist and not force:
-        print(f"All benchmark files already exist in {output_dir}")
-        return output_dir
-    
-    # Download files (only missing ones if not forcing)
-    for filename, url in benchmark_files.items():
-        output_file = output_dir / filename
-        if output_file.exists() and not force:
-            print(f"Using cached {filename}")
-            continue
-            
-        print(f"Downloading {filename}...")
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            with open(output_file, "wb") as f:
-                f.write(response.content)
-        except Exception as e:
-            print(f"Error downloading {filename}: {e}")
-    
-    return output_dir
+    print(f"Benchmark files are available in the cache directory: {CACHE_DIR}")
+    return CACHE_DIR
 
 def load_benchmark_results(
-    species=None,
-    traits=None,
-    models=None,
-    summarize=True,
-    download=False,
-    download_dir=None
+    species: Optional[Union[str, List[str]]] = None,
+    traits: Optional[Union[str, List[str]]] = None,
+    models: Optional[Union[str, List[str]]] = None,
+    summarize: bool = True,
+    download: bool = False # This now acts as 'force_refresh' for the specific file
 ):
     """
-    Load benchmark results, checking local files first before online sources.
-    
-    Parameters:
-    -----------
-    species : str or list of str, optional
-        Species to filter by (e.g., "barley", "bean", "lentil").
-    traits : str or list of str, optional
-        Traits to filter by (e.g., "BaMMV", "DF", "DTF").
-    models : str or list of str, optional
-        Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost").
-    summarize : bool
-        Whether to use summarized results (True) or raw results (False).
-    download : bool
-        If True, explicitly download data to local storage.
-    download_dir : str or Path, optional
-        Directory to save files if downloading. Defaults to cache directory.
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        DataFrame containing the benchmark results, filtered as specified.
+    Load benchmark results from local cache, downloading if necessary.
+    The 'download_dir' parameter is removed; files are always handled in the central cache.
     """
-    # Determine which file to use
     filename = "results_summary.csv" if summarize else "results_raw.csv"
-    
-    # Base GitHub URL (derived from index URL)
     base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
     file_url = base_url + filename
     
-    # Determine directory to use
-    data_dir = Path(download_dir) if download_dir else CACHE_DIR
+    # Ensure the file is in the cache and get its path
+    # 'download' parameter maps to 'force' in _download_cached_file
+    cached_file_path = _download_cached_file(file_url, filename, force=download)
     
-    # Check if file exists locally
-    file_path = data_dir / filename
-    file_exists = file_path.exists()
+    print(f"Loading {filename} from cache: {cached_file_path}...")
+    df = pd.read_csv(cached_file_path)
     
-    # If file exists locally, load it directly
-    if file_exists:
-        print(f"Loading {filename} from {data_dir}...")
-        df = pd.read_csv(file_path)
-    
-    # If file doesn't exist and download is requested, download it
-    elif download:
-        print(f"File not found in {data_dir}. Downloading...")
-        download_benchmark_data(output_dir=data_dir)
-        
-        # Now load the downloaded file
-        df = pd.read_csv(data_dir / filename)
-    
-    # If file doesn't exist and download not requested, try online loading
-    else:
-        try:
-            print(f"Loading {filename} from online source...")
-            df = pd.read_csv(file_url)
-        except Exception as e:
-            print(f"Failed to load from online source: {e}")
-            print(f"No local file found at {file_path} and online loading failed.")
-            raise
-    
-    # Convert single values to lists for consistent filtering
-    if isinstance(species, str):
-        species = [species]
+    # Resolve species names if provided for filtering
+    resolved_species_filter: Optional[List[str]] = None
+    if species is not None:
+        index_data = load_index()
+        canonical_species_names = list(index_data.keys())
+        # species_alias_map will be loaded by _resolve_species_name if None
+
+        if isinstance(species, str):
+            resolved_species_filter = [_resolve_species_name(species, canonical_species_names, None)]
+        elif isinstance(species, list):
+            resolved_species_filter = [
+                _resolve_species_name(s, canonical_species_names, None) for s in species
+            ]
+        else:
+            raise TypeError("'species' must be a string or a list of strings.")
+
+    # Convert single string traits/models to lists for consistent filtering
     if isinstance(traits, str):
         traits = [traits]
     if isinstance(models, str):
         models = [models]
     
-    # Apply filters if provided - use case-insensitive column names
+    # Apply filters - use case-insensitive column names from CSV
     columns_lower = {col.lower(): col for col in df.columns}
     
-    if species is not None and "species" in columns_lower:
-        df = df[df[columns_lower["species"]].isin(species)]
+    if resolved_species_filter is not None and "species" in columns_lower:
+        df = df[df[columns_lower["species"]].isin(resolved_species_filter)]
     if traits is not None and "trait" in columns_lower:
-        df = df[df[columns_lower["trait"]].isin(traits)]
+        df = df[df[columns_lower["trait"]].isin(traits)] # Trait names are case-sensitive
     if models is not None and "model" in columns_lower:
-        df = df[df[columns_lower["model"]].isin(models)]
+        df = df[df[columns_lower["model"]].isin(models)] # Model names likely case-sensitive
     
+    if df.empty:
+        print("Warning: Filtering resulted in an empty DataFrame. Check your filter criteria.")
+        
     return df
+
+# Ensure __init__.py reflects any changes to exported functions if necessary.
+# For example, load_species_aliases is internal and should not be in __init__.py.
+# download_index and load_index are kept as they are part of the public API.
