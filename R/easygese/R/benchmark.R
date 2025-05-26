@@ -8,16 +8,18 @@ NULL
 #' Downloads benchmark result files (results_raw.csv and results_summary.csv)
 #' from the EasyGeSe GitHub repository to the local cache.
 #' 
+#' @param output_dir Directory to save downloaded files. If NULL, uses the default cache directory.
 #' @param force If TRUE, force re-download even if cache exists for each file.
 #'
 #' @return Path to the cache directory containing the downloaded files.
 #' @export
-download_benchmark_data <- function(force = FALSE) {
+download_benchmark_data <- function(output_dir = NULL, force = FALSE) {
   # Base GitHub URL (derived from INDEX_URL in utils.R)
   # Ensure INDEX_URL is accessible within the package scope
   base_url <- gsub("index\\.json$", "", INDEX_URL) 
   
-  cache_dir_path <- get_cache_dir() # All benchmark data goes to the central cache
+  # Use user-specified directory or default cache directory
+  cache_dir_path <- if (is.null(output_dir)) get_cache_dir() else output_dir
   
   benchmark_files_info <- list(
     list(name = "results_raw.csv", url = paste0(base_url, "results_raw.csv")),
@@ -27,10 +29,15 @@ download_benchmark_data <- function(force = FALSE) {
   for (file_info in benchmark_files_info) {
     message(paste("Ensuring", file_info$name, "is cached..."))
     # download_cached_file will download if not present or if force is TRUE
-    download_cached_file(file_info$url, file_info$name, force = force)
+    # Pass the custom output directory if specified
+    if (is.null(output_dir)) {
+      download_cached_file(file_info$url, file_info$name, force = force)
+    } else {
+      download_cached_file(file_info$url, file_info$name, output_dir = output_dir, force = force)
+    }
   }
   
-  message(paste("Benchmark files are available in the cache directory:", cache_dir_path))
+  message(paste("Benchmark files are available in the directory:", cache_dir_path))
   return(invisible(cache_dir_path))
 }
 
@@ -47,6 +54,7 @@ download_benchmark_data <- function(force = FALSE) {
 #' @param models Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost"). Case-sensitive.
 #' @param summarize Whether to use summarized results (TRUE) or raw results (FALSE).
 #' @param download If TRUE, force re-download of the specific benchmark file being loaded.
+#' @param download_dir Directory to save downloaded files. If NULL, uses the default cache directory.
 #'
 #' @return Data frame containing the benchmark results, filtered as specified.
 #' @export
@@ -55,7 +63,8 @@ load_benchmark_results <- function(
   traits = NULL,
   models = NULL,
   summarize = TRUE,
-  download = FALSE # This now acts as force_refresh for the specific file
+  download = FALSE, # This now acts as force_refresh for the specific file
+  download_dir = NULL
 ) {
   # Determine which file to use
   filename <- if (summarize) "results_summary.csv" else "results_raw.csv"
@@ -66,7 +75,8 @@ load_benchmark_results <- function(
   
   # Ensure the file is in the cache and get its path
   # The 'download' parameter here maps to 'force' in download_cached_file
-  cached_file_path <- download_cached_file(file_url, filename, force = download)
+  # Pass the custom download directory if specified
+  cached_file_path <- download_cached_file(file_url, filename, output_dir = download_dir, force = download)
   
   message(paste("Loading", filename, "from cache:", cached_file_path, "..."))
   df <- read.csv(cached_file_path)

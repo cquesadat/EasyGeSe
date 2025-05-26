@@ -24,11 +24,19 @@ get_cache_dir <- function() {
 #'
 #' @param file_url URL of the file to download.
 #' @param local_filename Name of the file to save in the cache directory.
+#' @param output_dir Directory to save the file. If NULL, uses the default cache directory.
 #' @param force If TRUE, force re-download even if cache exists.
 #' @return Path to the cached file.
 #' @noRd
-download_cached_file <- function(file_url, local_filename, force = FALSE) {
-  cache_dir <- get_cache_dir()
+download_cached_file <- function(file_url, local_filename, output_dir = NULL, force = FALSE) {
+  # Use specified directory or default cache directory
+  cache_dir <- if (is.null(output_dir)) get_cache_dir() else output_dir
+  
+  # Create directory if it doesn't exist
+  if (!dir.exists(cache_dir)) {
+    dir.create(cache_dir, recursive = TRUE)
+  }
+  
   cache_file_path <- file.path(cache_dir, local_filename)
   
   if (file.exists(cache_file_path) && !force) {

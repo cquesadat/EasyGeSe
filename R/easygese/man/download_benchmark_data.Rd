@@ -4,9 +4,11 @@
 \alias{download_benchmark_data}
 \title{Download benchmark data}
 \usage{
-download_benchmark_data(force = FALSE)
+download_benchmark_data(output_dir = NULL, force = FALSE)
 }
 \arguments{
+\item{output_dir}{Directory to save downloaded files. If NULL, uses the default cache directory.}
+
 \item{force}{If TRUE, force re-download even if cache exists for each file.}
 }
 \value{

@@ -122,5 +122,43 @@ test_that("Basic functionality works", {
   })
 })
 
-# You can add more test_that blocks if you want to test other aspects of 
-# resolve_species_name_internal in isolation.
+test_that("Benchmark download with custom directory works", {
+  # Create a temporary directory for testing
+  temp_dir <- tempfile("easygese_benchmark_test")
+  dir.create(temp_dir, recursive = TRUE)
+  
+  tryCatch({
+    # Test download_benchmark_data with custom output_dir
+    benchmark_dir <- download_benchmark_data(output_dir = temp_dir, force = TRUE)
+    expect_equal(benchmark_dir, temp_dir)
+    
+    # Check that files were downloaded to the custom directory
+    expect_true(file.exists(file.path(temp_dir, "results_raw.csv")))
+    expect_true(file.exists(file.path(temp_dir, "results_summary.csv")))
+    
+    # Test load_benchmark_results with custom download_dir
+    results <- load_benchmark_results(summarize = TRUE, download_dir = temp_dir)
+    expect_s3_class(results, "data.frame")
+    expect_gt(nrow(results), 0)
+    
+    # Test that the file was loaded from the custom directory
+    # (we can verify this by checking the file exists in our temp dir)
+    expect_true(file.exists(file.path(temp_dir, "results_summary.csv")))
+    
+  }, finally = {
+    # Clean up temporary directory
+    unlink(temp_dir, recursive = TRUE)
+  })
+})
+
+test_that("Benchmark functions maintain backward compatibility", {
+  # Test that default behavior (NULL directories) still works
+  results_default <- load_benchmark_results(summarize = TRUE)
+  expect_s3_class(results_default, "data.frame")
+  expect_gt(nrow(results_default), 0)
+  
+  # Test download_benchmark_data with default directory
+  default_dir <- download_benchmark_data(force = FALSE)
+  expect_type(default_dir, "character")
+  expect_true(dir.exists(default_dir))
+})

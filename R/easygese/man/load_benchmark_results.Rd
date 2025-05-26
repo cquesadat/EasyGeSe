@@ -9,7 +9,8 @@ load_benchmark_results(
   traits = NULL,
   models = NULL,
   summarize = TRUE,
-  download = FALSE
+  download = FALSE,
+  download_dir = NULL
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ are also accepted. See \code{list_species()} for available canonical names.}
 \item{summarize}{Whether to use summarized results (TRUE) or raw results (FALSE).}
 
 \item{download}{If TRUE, force re-download of the specific benchmark file being loaded.}
+
+\item{download_dir}{Directory to save downloaded files. If NULL, uses the default cache directory.}
 }
 \value{
 Data frame containing the benchmark results, filtered as specified.
