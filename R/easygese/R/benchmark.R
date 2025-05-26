@@ -88,8 +88,8 @@ load_benchmark_results <- function(
     # species_alias_map will be loaded by resolve_species_name_internal if NULL
     
     # Helper function to resolve a single species name
-    resolve_one_species <- function(s_input) {
-      resolve_species_name_internal(s_input, canonical_species_names, species_alias_map = NULL)
+    resolve_one_species <- function(species_input) {
+      resolve_species_name_internal(species_input, canonical_species_names, species_alias_map = NULL)
     }
     
     # Apply resolution to all provided species inputs

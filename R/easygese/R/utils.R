@@ -100,11 +100,39 @@ load_species_aliases <- function(force_refresh = FALSE) {
 
 #' Resolve species name using aliases and canonical list
 #'
-#' @param species_input User-provided species name (string).
+#' This function resolves user-provided species names to their canonical forms using
+#' an alias mapping system. Alias resolution is case-insensitive, but a warning will
+#' be issued if the resolved canonical name differs from the user input (indicating
+#' an alias was used).
+#'
+#' @param species_input User-provided species name (single character string).
 #' @param canonical_species_names A character vector of valid canonical species names.
 #' @param species_alias_map A named list/vector where names are lowercase aliases 
-#'                          and values are canonical names. If NULL, it will be loaded.
-#' @return The canonical species name if resolved.
+#'                          and values are canonical names. If NULL, it will be loaded
+#'                          automatically from the species aliases file.
+#' 
+#' @details
+#' The function performs the following steps:
+#' \itemize{
+#'   \item Converts user input to lowercase for case-insensitive matching
+#'   \item Searches for the lowercase input in the alias map
+#'   \item Returns the canonical name if found
+#'   \item Issues a warning if the canonical name differs from user input
+#'   \item Throws an error if no match is found, listing available options
+#' }
+#' 
+#' @return The canonical species name (character string) if successfully resolved.
+#' 
+#' @examples
+#' \dontrun{
+#' # These would all resolve to "lentil" (with warnings for aliases)
+#' resolve_species_name_internal("lentils", canonical_names, alias_map)  # alias
+#' resolve_species_name_internal("Lentil", canonical_names, alias_map)   # case difference
+#' resolve_species_name_internal("lentil", canonical_names, alias_map)   # exact match
+#' }
+#' 
+#' @seealso \code{\link{load_species_aliases}} for loading the alias mapping
+#' 
 #' @noRd
 resolve_species_name_internal <- function(species_input, canonical_species_names, species_alias_map = NULL) {
   if (!is.character(species_input) || length(species_input) != 1) {
