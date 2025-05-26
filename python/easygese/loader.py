@@ -16,32 +16,49 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # --- Generic Cache and Load Utilities ---
-def _download_cached_file(file_url: str, local_filename: str, force: bool = False) -> Path:
+def _download_cached_file(file_url: str, local_filename: str, output_dir: Optional[Union[str, Path]] = None, force: bool = False) -> Path:
     """
     Download a file and cache it locally.
-    Returns the path to the cached file.
+    
+    Args:
+        file_url: URL of the file to download
+        local_filename: Name of the file to save locally
+        output_dir: Directory to save the file. If None, uses the default cache directory
+        force: If True, force re-download even if cache exists
+        
+    Returns:
+        Path to the cached file
     """
-    cache_file_path = CACHE_DIR / local_filename
+    # Use specified directory or default cache directory
+    cache_dir = Path(output_dir) if output_dir is not None else CACHE_DIR
+    
+    # Create directory if it doesn't exist
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    cache_file_path = cache_dir / local_filename
     
     if cache_file_path.exists() and not force:
         return cache_file_path
-        
+    
     try:
         print(f"Downloading {local_filename} from {file_url}...")
         response = requests.get(file_url, timeout=10)
         response.raise_for_status()
         
-        with open(cache_file_path, "wb") as f: # Use "wb" for binary content
+        with open(cache_file_path, "wb") as f:
             f.write(response.content)
             
         print(f"{local_filename} cached at {cache_file_path}")
         return cache_file_path
+        
     except Exception as e:
-        print(f"Error downloading {local_filename} from {file_url}: {e}")
+        error_message = f"Error downloading {local_filename} from {file_url}: {e}"
+        print(error_message)
         if cache_file_path.exists():
-            print(f"Using existing cached {local_filename}.")
+            print(f"Using existing cached {local_filename}")
             return cache_file_path
-        raise # Re-raise if download fails and no cache available
+        # Re-raise the error if download fails and no cache exists
+        raise Exception(error_message)
 
 def _load_cached_json(file_url: str, local_filename: str, force_refresh: bool = False) -> Dict[str, Any]:
     """
@@ -340,35 +357,61 @@ def get_cv_indices(z: Dict[str, Any], trait: str) -> pd.DataFrame:
     return df
 
 
-def download_benchmark_data(force: bool = False) -> Path:
+def download_benchmark_data(output_dir: Optional[Union[str, Path]] = None, force: bool = False) -> Path:
     """
     Download benchmark result files (results_raw.csv and results_summary.csv)
-    to the central cache directory.
+    from the EasyGeSe GitHub repository to the local cache.
+    
+    Args:
+        output_dir: Directory to save downloaded files. If None, uses the default cache directory
+        force: If True, force re-download even if cache exists for each file
+        
+    Returns:
+        Path to the directory containing the downloaded files
     """
-    base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/" # Derive base URL
+    # Base GitHub URL (derived from INDEX_URL)
+    base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
     
-    benchmark_files_info = {
-        "results_raw.csv": base_url + "results_raw.csv",
-        "results_summary.csv": base_url + "results_summary.csv"
-    }
+    # Use user-specified directory or default cache directory
+    cache_dir_path = Path(output_dir) if output_dir is not None else CACHE_DIR
     
-    for filename, url in benchmark_files_info.items():
-        print(f"Ensuring benchmark file {filename} is cached...")
-        _download_cached_file(url, filename, force=force)
+    benchmark_files_info = [
+        {"name": "results_raw.csv", "url": base_url + "results_raw.csv"},
+        {"name": "results_summary.csv", "url": base_url + "results_summary.csv"}
+    ]
     
-    print(f"Benchmark files are available in the cache directory: {CACHE_DIR}")
-    return CACHE_DIR
+    for file_info in benchmark_files_info:
+        print(f"Ensuring {file_info['name']} is cached...")
+        # download_cached_file will download if present or if force is True
+        # Pass the custom output directory if specified
+        _download_cached_file(file_info["url"], file_info["name"], output_dir=output_dir, force=force)
+    
+    print(f"Benchmark files are available in the directory: {cache_dir_path}")
+    return cache_dir_path
 
 def load_benchmark_results(
     species: Optional[Union[str, List[str]]] = None,
     traits: Optional[Union[str, List[str]]] = None,
     models: Optional[Union[str, List[str]]] = None,
     summarize: bool = True,
-    download: bool = False # This now acts as 'force_refresh' for the specific file
+    download: bool = False, # This now acts as 'force_refresh' for the specific file
+    download_dir: Optional[Union[str, Path]] = None
 ):
     """
     Load benchmark results from local cache, downloading if necessary.
-    The 'download_dir' parameter is removed; files are always handled in the central cache.
+    
+    Args:
+        species: The name of the species to load. Can be a single string or a list of strings.
+                Common aliases (e.g., "lentils" for "lentil", "corn" for "maize")
+                are also accepted. See list_species() for available canonical names.
+        traits: Traits to filter by (e.g., "BaMMV", "DF", "DTF"). Case-sensitive.
+        models: Models to filter by (e.g., "BayesA", "GBLUP", "XGBoost"). Case-sensitive.
+        summarize: Whether to use summarized results (True) or raw results (False).
+        download: If True, force re-download of the specific benchmark file being loaded.
+        download_dir: Directory to save downloaded files. If None, uses the default cache directory.
+        
+    Returns:
+        DataFrame containing the benchmark results, filtered as specified.
     """
     filename = "results_summary.csv" if summarize else "results_raw.csv"
     base_url = "/".join(INDEX_URL.split("/")[:-1]) + "/"
@@ -376,7 +419,8 @@ def load_benchmark_results(
     
     # Ensure the file is in the cache and get its path
     # 'download' parameter maps to 'force' in _download_cached_file
-    cached_file_path = _download_cached_file(file_url, filename, force=download)
+    # Pass the custom download directory if specified
+    cached_file_path = _download_cached_file(file_url, filename, output_dir=download_dir, force=download)
     
     print(f"Loading {filename} from cache: {cached_file_path}...")
     df = pd.read_csv(cached_file_path)
@@ -409,13 +453,13 @@ def load_benchmark_results(
     if resolved_species_filter is not None and "species" in columns_lower:
         df = df[df[columns_lower["species"]].isin(resolved_species_filter)]
     if traits is not None and "trait" in columns_lower:
-        df = df[df[columns_lower["trait"]].isin(traits)] # Trait names are case-sensitive
+        df = df[df[columns_lower["trait"]].isin(traits)]
     if models is not None and "model" in columns_lower:
-        df = df[df[columns_lower["model"]].isin(models)] # Model names likely case-sensitive
+        df = df[df[columns_lower["model"]].isin(models)]
     
-    if df.empty:
-        print("Warning: Filtering resulted in an empty DataFrame. Check your filter criteria.")
-        
+    if len(df) == 0:
+        print("Warning: Filtering resulted in an empty DataFrame. Check your filter criteria and the content of the benchmark file.")
+    
     return df
 
 # Ensure __init__.py reflects any changes to exported functions if necessary.

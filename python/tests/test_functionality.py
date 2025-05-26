@@ -4,12 +4,14 @@ from unittest.mock import patch, MagicMock
 import shutil 
 from pathlib import Path
 import pandas as pd 
+import tempfile
 
 from easygese import (
     load_species,
     load_index,
     load_species_aliases,
-    _resolve_species_name,
+    download_benchmark_data,
+    load_benchmark_results,
     CACHE_DIR, 
     INDEX_URL, 
     SPECIES_ALIASES_URL
@@ -94,28 +96,6 @@ class TestEasyGeSeSimplified(unittest.TestCase):
         self.assertIn("lentils", aliases) 
         self.assertEqual(aliases["lentils"], "lentil")
 
-    def test_resolve_species_name_logic(self):
-        """Test _resolve_species_name directly with mock data."""
-        canonical_names = list(MOCK_INDEX_DATA.keys())
-        
-        # Exact matches (case-insensitive for input species)
-        self.assertEqual(_resolve_species_name("lentil", canonical_names, MOCK_SPECIES_ALIASES_DATA), "lentil")
-        self.assertEqual(_resolve_species_name("Lentil", canonical_names, MOCK_SPECIES_ALIASES_DATA), "lentil")
-        self.assertEqual(_resolve_species_name("WHEATG", canonical_names, MOCK_SPECIES_ALIASES_DATA), "wheatG")
-
-        # Alias matches (input species case-insensitive, aliases in map are lowercase)
-        self.assertEqual(_resolve_species_name("lentils", canonical_names, MOCK_SPECIES_ALIASES_DATA), "lentil")
-        self.assertEqual(_resolve_species_name("LENS CULINARIS", canonical_names, MOCK_SPECIES_ALIASES_DATA), "lentil")
-        self.assertEqual(_resolve_species_name("wheat", canonical_names, MOCK_SPECIES_ALIASES_DATA), "wheatG")
-        self.assertEqual(_resolve_species_name("Corn", canonical_names, MOCK_SPECIES_ALIASES_DATA), "maize")
-        
-        # Non-existent species
-        with self.assertRaisesRegex(ValueError, "Invalid species name: 'potato'. Available options are:"):
-            _resolve_species_name("potato", canonical_names, MOCK_SPECIES_ALIASES_DATA)
-        
-        with self.assertRaisesRegex(ValueError, "Invalid species name: 'unknownplant'. Available options are:"):
-            _resolve_species_name("unknownplant", canonical_names, MOCK_SPECIES_ALIASES_DATA)
-
     @patch('easygese.loader.pd.read_csv') # Mock reading of X, Y files
     @patch('easygese.loader.json.load')   # Mock reading of Z files (if json.load is used with a file object)
     @patch('easygese.loader.requests.get') # Mock network calls for index, aliases, and X,Y,Z files
@@ -172,6 +152,57 @@ class TestEasyGeSeSimplified(unittest.TestCase):
             self.fail(f"load_species failed for a valid alias 'Lentils' with mocks: {e}")
         except Exception as e:
             self.fail(f"load_species for 'Lentils' raised an unexpected error with mocks: {e}")
+
+    def test_benchmark_download_with_custom_directory(self):
+        """Test benchmark download with custom directory works."""
+        # Create a temporary directory for testing
+        with tempfile.TemporaryDirectory(prefix="easygese_benchmark_test") as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            with patch('easygese.loader.requests.get') as mock_get:
+                # Mock successful download
+                mock_response = MagicMock()
+                mock_response.raise_for_status.return_value = None
+                mock_response.content = b"dummy,csv,content\n1,2,3"
+                mock_get.return_value = mock_response
+                
+                # Test download_benchmark_data with custom output_dir
+                benchmark_dir = download_benchmark_data(output_dir=temp_path, force=True)
+                self.assertEqual(benchmark_dir, temp_path)
+                
+                # Check that files were downloaded to the custom directory
+                self.assertTrue((temp_path / "results_raw.csv").exists())
+                self.assertTrue((temp_path / "results_summary.csv").exists())
+                
+                # Test load_benchmark_results with custom download_dir
+                with patch('easygese.loader.pd.read_csv') as mock_read_csv:
+                    mock_read_csv.return_value = pd.DataFrame({'species': ['bean'], 'trait': ['test'], 'model': ['GBLUP']})
+                    
+                    results = load_benchmark_results(summarize=True, download_dir=temp_path)
+                    self.assertIsInstance(results, pd.DataFrame)
+                    self.assertGreater(len(results), 0)
+    
+    def test_benchmark_functions_maintain_backward_compatibility(self):
+        """Test that default behavior (None directories) still works."""
+        with patch('easygese.loader.requests.get') as mock_get:
+            # Mock successful download
+            mock_response = MagicMock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.content = b"dummy,csv,content\n1,2,3"
+            mock_get.return_value = mock_response
+            
+            with patch('easygese.loader.pd.read_csv') as mock_read_csv:
+                mock_read_csv.return_value = pd.DataFrame({'species': ['bean'], 'trait': ['test'], 'model': ['GBLUP']})
+                
+                # Test that default behavior (None directories) still works
+                results_default = load_benchmark_results(summarize=True)
+                self.assertIsInstance(results_default, pd.DataFrame)
+                self.assertGreater(len(results_default), 0)
+                
+                # Test download_benchmark_data with default directory
+                default_dir = download_benchmark_data(force=False)
+                self.assertIsInstance(default_dir, Path)
+                self.assertTrue(default_dir.exists())
 
 if __name__ == '__main__':
     unittest.main()

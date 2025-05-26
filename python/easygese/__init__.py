@@ -6,6 +6,10 @@ from .loader import (
     load_species,
     list_traits,
     get_cv_indices,
+    load_species_aliases,  # This one is okay if it's a public function
     download_benchmark_data,
-    load_benchmark_results
+    load_benchmark_results,
+    CACHE_DIR,
+    INDEX_URL,
+    SPECIES_ALIASES_URL
 )
