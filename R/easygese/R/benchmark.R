@@ -127,7 +127,18 @@ load_benchmark_results <- function(
   }
   
   if (nrow(df) == 0) {
-    warning("Filtering resulted in an empty data frame. Check your filter criteria and the content of the benchmark file.")
+    filters_applied <- c(
+      if (!is.null(resolved_species)) paste("species:", paste(resolved_species, collapse = ", ")),
+      if (!is.null(traits)) paste("traits:", paste(traits, collapse = ", ")),
+      if (!is.null(models)) paste("models:", paste(models, collapse = ", "))
+    )
+    
+    if (length(filters_applied) > 0) {
+      warning(paste0("No results found with filters: ", paste(filters_applied, collapse = "; "), 
+                     ". Try load_benchmark_results() without filters to see available values."), call. = FALSE)
+    } else {
+      warning("The benchmark data appears to be empty.", call. = FALSE)
+    }
   }
   
   return(df)

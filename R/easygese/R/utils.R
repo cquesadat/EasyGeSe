@@ -150,8 +150,8 @@ resolve_species_name_internal <- function(species_input, canonical_species_names
     canonical_name <- species_alias_map[[user_input_lower]]
     
     if (species_input != canonical_name) {
-      warning(paste0("Alias '", species_input, "' mapped to '", canonical_name, "'.\n'",
-                     species_input, "' is not a recognized canonical species. See list_species() for available canonical names."))
+      warning(paste0("Using canonical name '", canonical_name, "' for alias '", species_input, "'. ", 
+                     "For a list of canonical species names, use list_species()."), call. = FALSE)
     }
     return(canonical_name)
   }
