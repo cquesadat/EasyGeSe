@@ -7,12 +7,12 @@ EasyGeSe is a comprehensive [database](https://zenodo.org/records/15348871) for 
 The data are formatted, filtered and arranged in easy to use formats; with functions in R and Python for easy loading.
 
 # Code
-Find out how to use EasyGeSe with your favourite programing language below or in the specific `README.md` in each subdirectory.
+Find out how to use EasyGeSe with your favourite programing language in the specific `README.md` in each subdirectory.
 
 
-For all tools the options are:
+The datasets present in this resource originate from the following sources: 
 
-| Option | Reference |
+| Dataset | Reference |
 | ------ | ------ |
 | "barley" | Gonzalez, Maria Y., et al. \'Genomic prediction models trained with historical records enable populating the German ex situ genebank bio-digital resource center of barley (Hordeum sp.) with information on resistances to soilborne barley mosaic viruses.\' Theoretical and Applied Genetics 134 (2021): 2181-2196. |
 | "bean" | Diaz, Santiago, et al. \'Genetic mapping for agronomic traits in a MAGIC population of common bean (Phaseolus vulgaris L.) under drought conditions.\' BMC genomics 21.1 (2020): 1-20. |
