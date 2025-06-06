@@ -7,13 +7,14 @@
 download_benchmark_data(output_dir = NULL, force = FALSE)
 }
 \arguments{
-\item{output_dir}{Directory to save files. Defaults to user cache directory}
+\item{output_dir}{Directory to save downloaded files. If NULL, uses the default cache directory.}
 
-\item{force}{If TRUE, force re-download even if cache exists}
+\item{force}{If TRUE, force re-download even if cache exists for each file.}
 }
 \value{
-Path to directory containing the downloaded files
+Path to the cache directory containing the downloaded files.
 }
 \description{
-Downloads benchmark result files from the EasyGeSe GitHub repository.
+Downloads benchmark result files (results_raw.csv and results_summary.csv)
+from the EasyGeSe GitHub repository to the local cache.
 }
