@@ -7,8 +7,7 @@ EasyGeSe is a comprehensive [database](https://zenodo.org/records/15348871) for 
 The data are formatted, filtered and arranged in easy to use formats; with functions in R and Python for easy loading.
 
 # Code
-Find out how to use EasyGeSe with your favourite programing language below or in the specific `README.md` in each subdirectory.
-
+Find out how to use EasyGeSe with your favourite programing language in the specific `README.md` in each subdirectory.
 
 For all tools the options are:
 
